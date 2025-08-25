@@ -62,6 +62,7 @@ export class FtpServer {
             const { SizeCommand } = await import('../commands/size.js');
             const { MdtmCommand } = await import('../commands/mdtm.js');
             const { PasvCommand } = await import('../commands/pasv.js');
+            const { HelpCommand } = await import('../commands/help.js');
 
             // Register commands
             this.registerCommand(new UserCommand(this.config.apiUrl, this.config.debug));
@@ -77,6 +78,7 @@ export class FtpServer {
             this.registerCommand(new SizeCommand(this.config.apiUrl, this.config.debug));
             this.registerCommand(new MdtmCommand(this.config.apiUrl, this.config.debug));
             this.registerCommand(new PasvCommand(this.config.apiUrl, this.config.debug));
+            this.registerCommand(new HelpCommand(this.config.apiUrl, this.config.debug));
 
             if (this.config.debug) {
                 console.log(`📋 Command handlers loaded: ${this.commandHandlers.size}`);
