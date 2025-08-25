@@ -50,4 +50,8 @@ export class MonkApiClient {
     async delete(path: string, options: any, jwtToken: string): Promise<any> {
         return this.callFtpEndpoint('delete', { path, ftp_options: options }, jwtToken);
     }
+
+    async stat(path: string, jwtToken: string): Promise<any> {
+        return this.callFtpEndpoint('stat', { path }, jwtToken);
+    }
 }

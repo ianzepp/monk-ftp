@@ -57,6 +57,7 @@ export class FtpServer {
             const { StorCommand } = await import('../commands/stor.js');
             const { RetrCommand } = await import('../commands/retr.js');
             const { DeleCommand } = await import('../commands/dele.js');
+            const { StatCommand } = await import('../commands/stat.js');
 
             // Register commands
             this.registerCommand(new UserCommand(this.config.apiUrl, this.config.debug));
@@ -67,6 +68,7 @@ export class FtpServer {
             this.registerCommand(new StorCommand(this.config.apiUrl, this.config.debug));
             this.registerCommand(new RetrCommand(this.config.apiUrl, this.config.debug));
             this.registerCommand(new DeleCommand(this.config.apiUrl, this.config.debug));
+            this.registerCommand(new StatCommand(this.config.apiUrl, this.config.debug));
 
             if (this.config.debug) {
                 console.log(`📋 Command handlers loaded: ${this.commandHandlers.size}`);

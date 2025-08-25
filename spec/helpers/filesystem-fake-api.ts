@@ -75,6 +75,8 @@ export class FilesystemFakeApi {
                 await this.handleFtpRetrieve(req, res, body);
             } else if (url.pathname === '/ftp/delete' && req.method === 'POST') {
                 await this.handleFtpDelete(req, res, body);
+            } else if (url.pathname === '/ftp/stat' && req.method === 'POST') {
+                await this.handleFtpStat(req, res, body);
             } else if (url.pathname === '/health' && req.method === 'GET') {
                 this.sendJsonResponse(res, 200, { status: 'ok', server: 'filesystem-fake-api' });
             } else {
@@ -353,6 +355,98 @@ export class FilesystemFakeApi {
         
         if (this.config.debug) {
             console.log(`🎭 Response ${statusCode}:`, JSON.stringify(data, null, 2));
+        }
+    }
+
+    private async handleFtpStat(req: http.IncomingMessage, res: http.ServerResponse, body: any): Promise<void> {
+        const { path: ftpPath } = body;
+        
+        if (!this.isAuthenticated(req)) {
+            this.sendJsonResponse(res, 401, { error: 'Authentication required' });
+            return;
+        }
+
+        try {
+            const statInfo = await this.getFileSystemStat(ftpPath);
+            this.sendJsonResponse(res, 200, statInfo);
+        } catch (error) {
+            this.sendJsonResponse(res, 404, { 
+                success: false, 
+                error: error instanceof Error ? error.message : 'Path not found' 
+            });
+        }
+    }
+
+    private async getFileSystemStat(ftpPath: string): Promise<any> {
+        const fsPath = this.ftpPathToFilesystem(ftpPath);
+        const fullPath = path.join(this.dataPath, fsPath);
+
+        try {
+            const stats = await fs.stat(fullPath);
+            
+            // Parse path to understand what we're looking at
+            const pathParts = ftpPath.split('/').filter(p => p.length > 0);
+            const isSchema = pathParts.length === 2 && pathParts[0] === 'data';
+            const isRecord = pathParts.length === 3 && pathParts[0] === 'data';
+            const isField = pathParts.length === 4 && pathParts[0] === 'data';
+            
+            const response = {
+                success: true,
+                path: ftpPath,
+                type: stats.isDirectory() ? 'directory' : 'file',
+                permissions: stats.isDirectory() ? 'rwx' : 'rw-',
+                size: stats.size,
+                modified_time: this.dateToFtpTimestamp(stats.mtime),
+                created_time: this.dateToFtpTimestamp(stats.birthtime || stats.mtime),
+                access_time: this.dateToFtpTimestamp(stats.atime),
+                record_info: {
+                    schema: isSchema || isRecord || isField ? pathParts[1] : undefined,
+                    record_id: isRecord || isField ? pathParts[2] : undefined,
+                    field_name: isField ? pathParts[3] : undefined,
+                    soft_deleted: false,
+                    access_permissions: ['read', 'edit', 'full']
+                }
+            };
+
+            // Add directory-specific information
+            if (stats.isDirectory()) {
+                try {
+                    const entries = await fs.readdir(fullPath);
+                    response.children_count = entries.length;
+                    
+                    // Calculate total size for directories
+                    let totalSize = 0;
+                    for (const entry of entries) {
+                        try {
+                            const entryStats = await fs.stat(path.join(fullPath, entry));
+                            totalSize += entryStats.size;
+                        } catch {
+                            // Skip entries we can't stat
+                        }
+                    }
+                    response.total_size = totalSize;
+                } catch {
+                    response.children_count = 0;
+                    response.total_size = 0;
+                }
+            }
+
+            // Add field count for record directories
+            if (isRecord && stats.isDirectory()) {
+                try {
+                    const recordJsonPath = path.join(fullPath, `../${pathParts[2]}.json`);
+                    const recordContent = await fs.readFile(recordJsonPath, 'utf-8');
+                    const recordData = JSON.parse(recordContent);
+                    response.record_info.field_count = Object.keys(recordData).length;
+                } catch {
+                    response.record_info.field_count = 0;
+                }
+            }
+
+            return response;
+            
+        } catch (error) {
+            throw new Error(`Path not found: ${ftpPath}`);
         }
     }
 }
