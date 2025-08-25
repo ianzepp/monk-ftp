@@ -16,6 +16,10 @@ export interface FtpConnection {
         socket?: net.Socket;
         port?: number;
         mode: 'passive' | 'active';
+        activeMode?: {
+            address: string;
+            port: number;
+        };
     };
 }
 
