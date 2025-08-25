@@ -529,4 +529,41 @@ DEBUG=monk-ftp:* npm run start:dev
 - **Benefits**: Shows detailed protocol flow, good for debugging
 - **Caution**: Always use timeouts, requires SSL disabled
 
+### **FUSE Filesystem Integration**
+
+Mount the FTP server as a local filesystem for Unix tool compatibility:
+
+#### **Setup Requirements**
+```bash
+# Install Python FUSE bindings
+pip install fusepy
+
+# Verify FUSE is available
+which fusermount fusermount3
+```
+
+#### **Mount Operations**
+```bash
+# Start monk-ftp servers
+npm run dev
+
+# Mount as filesystem
+./src/utils/mount-ftp.sh /tmp/monk-ftp-mount
+
+# Use standard Unix tools
+ls -la /tmp/monk-ftp-mount/data/users/
+cat /tmp/monk-ftp-mount/data/users/user-123.../email
+echo "new@email.com" > /tmp/monk-ftp-mount/data/users/user-123.../email
+grep "john" /tmp/monk-ftp-mount/data/users/*.json
+
+# Unmount when done
+./src/utils/unmount-ftp.sh /tmp/monk-ftp-mount
+```
+
+#### **FUSE Benefits**
+- **Standard Unix tools**: `ls`, `cat`, `grep`, `find`, `awk` all work
+- **Shell operations**: Pipes, redirects, globbing work naturally
+- **Scripting**: Bash scripts can operate on monk-api data as files
+- **Integration**: Works with any tool that reads/writes files
+
 This guide provides everything needed to develop, test, and deploy the Monk FTP Server, from initial setup through production deployment.
