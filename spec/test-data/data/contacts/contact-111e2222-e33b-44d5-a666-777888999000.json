@@ -1,0 +1,11 @@
+{
+  "id": "contact-111e2222-e33b-44d5-a666-777888999000",
+  "name": "Alice Johnson",
+  "email": "alice.johnson@example.com",
+  "phone": "+1-555-0123",
+  "account_id": "acc-550e8400-e29b-41d4-a716-446655440000",
+  "type": "customer",
+  "created_at": "2024-01-18T14:45:00Z",
+  "updated_at": "2024-01-30T10:20:00Z",
+  "status": "active"
+}

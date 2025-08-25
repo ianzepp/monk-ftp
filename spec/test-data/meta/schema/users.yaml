@@ -1,0 +1,22 @@
+name: users
+fields:
+  - name: id
+    type: uuid
+    required: true
+  - name: name
+    type: string
+    required: true
+  - name: email
+    type: email
+    required: true
+  - name: account_id
+    type: uuid
+    required: true
+  - name: role
+    type: string
+    enum: [admin, user, viewer]
+    default: user
+  - name: status
+    type: string
+    enum: [active, inactive, suspended]
+    default: active

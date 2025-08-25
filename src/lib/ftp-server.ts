@@ -49,12 +49,20 @@ export class FtpServer {
     private async loadCommandHandlers(): Promise<void> {
         // Load command handlers
         try {
+            const { UserCommand } = await import('../commands/user.js');
+            const { PassCommand } = await import('../commands/pass.js');
+            const { PwdCommand } = await import('../commands/pwd.js');
+            const { CwdCommand } = await import('../commands/cwd.js');
             const { ListCommand } = await import('../commands/list.js');
             const { StorCommand } = await import('../commands/stor.js');
             const { RetrCommand } = await import('../commands/retr.js');
             const { DeleCommand } = await import('../commands/dele.js');
 
             // Register commands
+            this.registerCommand(new UserCommand(this.config.apiUrl, this.config.debug));
+            this.registerCommand(new PassCommand(this.config.apiUrl, this.config.debug));
+            this.registerCommand(new PwdCommand(this.config.apiUrl, this.config.debug));
+            this.registerCommand(new CwdCommand(this.config.apiUrl, this.config.debug));
             this.registerCommand(new ListCommand(this.config.apiUrl, this.config.debug));
             this.registerCommand(new StorCommand(this.config.apiUrl, this.config.debug));
             this.registerCommand(new RetrCommand(this.config.apiUrl, this.config.debug));
@@ -131,8 +139,8 @@ export class FtpServer {
                 
                 await handler.execute(connection, args);
             } else {
-                // Handle basic commands inline for now
-                await this.handleBasicCommand(connection, command, args);
+                // Handle basic system commands
+                await this.handleSystemCommand(connection, command, args);
             }
         } catch (error) {
             console.error(`❌ [${connection.id}] Command error:`, error);
@@ -140,32 +148,8 @@ export class FtpServer {
         }
     }
 
-    private async handleBasicCommand(connection: FtpConnection, command: string, args: string): Promise<void> {
+    private async handleSystemCommand(connection: FtpConnection, command: string, args: string): Promise<void> {
         switch (command) {
-            case 'USER':
-                connection.username = args || 'anonymous';
-                this.sendResponse(connection, 331, `User ${connection.username} okay, need password`);
-                break;
-                
-            case 'PASS':
-                // Simple JWT validation - check if it looks like a JWT
-                if (args && args.split('.').length === 3) {
-                    connection.authenticated = true;
-                    connection.jwtToken = args;
-                    this.sendResponse(connection, 230, `User ${connection.username} logged in`);
-                } else {
-                    this.sendResponse(connection, 530, 'Authentication failed');
-                }
-                break;
-                
-            case 'PWD':
-                if (!connection.authenticated) {
-                    this.sendResponse(connection, 530, 'Not logged in');
-                    return;
-                }
-                this.sendResponse(connection, 257, `"${connection.currentPath}" is current directory`);
-                break;
-                
             case 'QUIT':
                 this.sendResponse(connection, 221, 'Goodbye');
                 this.closeConnection(connection);

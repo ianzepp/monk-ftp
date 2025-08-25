@@ -20,6 +20,7 @@
     "spec:all": "npm run spec:ts",
     "spec:one": "npm run spec:ts",
     "start:api": "tsx spec/helpers/fake-monk-api.ts",
+    "start:api:fs": "tsx spec/helpers/filesystem-fake-api.ts",
     "version:patch": "npm version patch",
     "version:minor": "npm version minor",
     "version:major": "npm version major",

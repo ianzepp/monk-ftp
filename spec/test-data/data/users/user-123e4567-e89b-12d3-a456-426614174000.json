@@ -1,0 +1,10 @@
+{
+  "id": "user-123e4567-e89b-12d3-a456-426614174000",
+  "name": "John Doe",
+  "email": "john.doe@acme.com",
+  "account_id": "acc-550e8400-e29b-41d4-a716-446655440000",
+  "role": "admin",
+  "created_at": "2024-01-16T08:00:00Z",
+  "updated_at": "2024-01-25T12:30:00Z",
+  "status": "active"
+}

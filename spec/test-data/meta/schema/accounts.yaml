@@ -1,0 +1,18 @@
+name: accounts
+fields:
+  - name: id
+    type: uuid
+    required: true
+  - name: name
+    type: string
+    required: true
+  - name: type
+    type: string
+    enum: [business, startup, personal]
+  - name: email
+    type: email
+    required: true
+  - name: status
+    type: string
+    enum: [active, inactive, suspended]
+    default: active

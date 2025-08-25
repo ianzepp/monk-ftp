@@ -34,7 +34,7 @@ describe('FTP Server', () => {
         
         const status = server.getStatus();
         expect(status.running).toBe(true);
-        expect(status.commands).toBe(4); // LIST, STOR, RETR, DELE
+        expect(status.commands).toBe(8); // USER, PASS, PWD, CWD, LIST, STOR, RETR, DELE
         
         // Stop server
         await server.stop();

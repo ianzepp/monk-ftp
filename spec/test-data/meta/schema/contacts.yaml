@@ -1,0 +1,23 @@
+name: contacts
+fields:
+  - name: id
+    type: uuid
+    required: true
+  - name: name
+    type: string
+    required: true
+  - name: email
+    type: email
+  - name: phone
+    type: string
+  - name: account_id
+    type: uuid
+    required: true
+  - name: type
+    type: string
+    enum: [customer, vendor, partner]
+    default: customer
+  - name: status
+    type: string
+    enum: [active, inactive]
+    default: active

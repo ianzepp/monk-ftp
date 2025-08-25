@@ -1,0 +1,10 @@
+{
+  "id": "user-987fcdeb-51a2-4567-9876-543210fedcba",
+  "name": "Jane Smith",
+  "email": "jane.smith@techstartup.io", 
+  "account_id": "acc-6ba7b810-9dad-11d1-80b4-00c04fd430c8",
+  "role": "user",
+  "created_at": "2024-02-02T11:20:00Z",
+  "updated_at": "2024-02-08T09:15:00Z",
+  "status": "active"
+}
