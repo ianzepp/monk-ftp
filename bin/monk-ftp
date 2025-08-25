@@ -1,0 +1,14 @@
+#!/usr/bin/env node
+
+/**
+ * monk-ftp CLI Entry Point
+ * 
+ * Command-line interface for the monk-ftp server
+ */
+
+import('../dist/index.js')
+    .then(({ main }) => main())
+    .catch((error) => {
+        console.error('❌ monk-ftp failed to start:', error);
+        process.exit(1);
+    });

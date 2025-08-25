@@ -1,33 +1,47 @@
 {
   "name": "monk-ftp",
   "version": "1.0.0",
-  "description": "FTP Protocol Proxy for Monk API - Translates FTP commands to HTTP API calls",
-  "main": "dist/ftp-cli.js",
+  "description": "FTP Protocol Server for monk-api integration - Bridge between FTP protocol and HTTP API",
+  "main": "dist/index.js",
   "type": "module",
-  "scripts": {
-    "build": "tsc",
-    "start": "node dist/ftp-cli.js",
-    "dev": "tsx watch src/ftp-cli.ts",
-    "test": "echo 'Tests not implemented yet'"
-  },
-  "dependencies": {
-    "node-fetch": "^3.3.2"
-  },
-  "devDependencies": {
-    "@types/node": "^20.10.0",
-    "tsx": "^4.6.0",
-    "typescript": "^5.3.0"
-  },
   "bin": {
-    "monk-ftp": "dist/ftp-cli.js"
+    "monk-ftp": "./bin/monk-ftp"
+  },
+  "scripts": {
+    "start": "node dist/index.js",
+    "start:dev": "tsx watch src/index.ts",
+    "compile": "tsc",
+    "spec": "scripts/spec.sh",
+    "spec:ts": "scripts/spec-ts.sh",
+    "spec:sh": "scripts/spec-sh.sh",
+    "test": "npm run spec",
+    "test:all": "npm run spec:sh",
+    "test:one": "npm run spec:sh",
+    "spec:all": "npm run spec:ts",
+    "spec:one": "npm run spec:ts",
+    "version:patch": "npm version patch",
+    "version:minor": "npm version minor",
+    "version:major": "npm version major",
+    "preversion": "npm run compile && npm run spec",
+    "postversion": "git push && git push --tags && gh release create v$npm_package_version --generate-notes"
   },
   "keywords": [
     "ftp",
-    "proxy", 
-    "api",
-    "monk",
-    "protocol-translation"
+    "protocol",
+    "server",
+    "typescript",
+    "monk-api"
   ],
-  "author": "Monk API Team",
-  "license": "MIT"
+  "author": "Ian Zepp",
+  "license": "MIT",
+  "dependencies": {},
+  "devDependencies": {
+    "@types/node": "^22",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3",
+    "vitest": "^3.2.4"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
 }
