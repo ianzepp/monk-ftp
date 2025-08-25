@@ -1,0 +1,33 @@
+{
+  "name": "monk-ftp",
+  "version": "1.0.0",
+  "description": "FTP Protocol Proxy for Monk API - Translates FTP commands to HTTP API calls",
+  "main": "dist/ftp-cli.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/ftp-cli.js",
+    "dev": "tsx watch src/ftp-cli.ts",
+    "test": "echo 'Tests not implemented yet'"
+  },
+  "dependencies": {
+    "node-fetch": "^3.3.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "tsx": "^4.6.0",
+    "typescript": "^5.3.0"
+  },
+  "bin": {
+    "monk-ftp": "dist/ftp-cli.js"
+  },
+  "keywords": [
+    "ftp",
+    "proxy", 
+    "api",
+    "monk",
+    "protocol-translation"
+  ],
+  "author": "Monk API Team",
+  "license": "MIT"
+}
