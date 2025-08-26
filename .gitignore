@@ -58,3 +58,4 @@ Thumbs.db
 .config/monk/server-pid
 # CRITICAL: Never ignore .config/monk/.gitkeep or .config/monk/README.md
 # These files are required for test environment functionalityfuse/
+TODO.md
