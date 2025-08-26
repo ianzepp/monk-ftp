@@ -26,8 +26,13 @@ export class SizeCommand extends BaseFtpCommand {
             const response = await this.apiClient.stat(filePath, connection.jwtToken!);
 
             if (response.success) {
-                // Return just the size
-                this.sendResponse(connection, 213, response.size.toString());
+                // Check if it's a directory - SIZE command should only work on files
+                if (response.type === 'directory') {
+                    this.sendResponse(connection, 550, 'Not a file');
+                } else {
+                    // Return just the size
+                    this.sendResponse(connection, 213, response.size.toString());
+                }
             } else {
                 this.sendResponse(connection, 550, 'File size not available');
             }

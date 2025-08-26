@@ -18,7 +18,7 @@ export class HelpCommand extends BaseFtpCommand {
             '214-The following commands are supported:',
             '214-USER PASS QUIT PWD CWD CDUP',
             '214-LIST STAT SIZE MDTM PASV',
-            '214-STOR RETR DELE',
+            '214-STOR RETR DELE CLNT',
             '214-SYST TYPE FEAT NOOP',
             '214 Help OK'
         ];

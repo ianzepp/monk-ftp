@@ -110,6 +110,7 @@ MONK_JWT_TOKEN=<your-jwt-token>
 #### **Information Commands** ✅
 - ✅ **LIST**: Directory listing (complete monk-api integration)
 - ✅ **STAT**: File/directory status (multi-line FTP format)
+- ✅ **CLNT**: Client identification (logging/debugging)
 
 #### **File Operations** ⏳
 - ⏳ **RETR**: File download (needs data connection)
@@ -287,6 +288,7 @@ echo "USER root\r\nPASS fake.jwt.token\r\nLIST\r\nSTAT /data/\r\nQUIT" | nc loca
 - ✅ **MDTM file** → 213 20250825151723 (real timestamp)
 - ✅ **PASV** → 227 Entering passive mode (127,0,0,1,p1,p2)
 - ✅ **HELP** → Multi-line command list for client compatibility
+- ✅ **CLNT NcFTP 3.2.6** → 200 OK (client identification)
 
 #### **Real Data Integration:**
 - **Schema level**: `/data/` shows `accounts`, `contacts`, `users`
@@ -414,15 +416,17 @@ DEBUG=monk-ftp:*
 ### **Working FTP Commands** ✅
 - **Authentication**: USER, PASS, QUIT (JWT token validation)
 - **Navigation**: PWD, CWD, CDUP (directory operations with API validation)
-- **Information**: LIST, STAT, SIZE, MDTM, HELP (complete metadata support)
+- **Information**: LIST, STAT, SIZE, MDTM, HELP, CLNT (complete metadata support)
 - **Data Transfer**: PASV, STOR, RETR (complete file transfer implementation)
 - **System**: SYST, TYPE, FEAT, NOOP (protocol compliance)
 
 ### **Complete Implementation** ✅
-- **14 FTP Commands**: Full command set covering authentication, navigation, file operations
+- **15 FTP Commands**: Full command set covering authentication, navigation, file operations
 - **Data Connections**: PASV mode with proper port allocation and client handling
 - **File Transfers**: Complete STOR/RETR implementation with monk-api integration
 - **Protocol Compliance**: RFC 959 compliance with proper response codes and formats
+- **Client Compatibility**: Full ncftp support with CLNT command identification
+- **FUSE Filesystem**: Working directory/file detection with Unix tool compatibility
 
 ### **Future Features** 📋
 - **Data Connection Management**: PASV/PORT modes for file transfers
@@ -565,5 +569,204 @@ grep "john" /tmp/monk-ftp-mount/data/users/*.json
 - **Shell operations**: Pipes, redirects, globbing work naturally
 - **Scripting**: Bash scripts can operate on monk-api data as files
 - **Integration**: Works with any tool that reads/writes files
+
+#### **FUSE Implementation Status** ✅
+- **Directory Detection**: Fixed SIZE command to properly reject directories (`550 Not a file`)
+- **File/Directory Distinction**: Proper `S_IFDIR` vs `S_IFREG` detection in `getattr()`
+- **Tree Navigation**: Complete directory traversal with `find .` command support
+- **Desktop Integration**: Suppressed common desktop environment probe errors
+- **Real Data Access**: Full compatibility with spec/test-data/ structure
+
+## Claude Code Development Guide
+
+### **Process Management**
+
+When working with Claude Code, proper background process management is critical to prevent orphaned processes and port conflicts.
+
+#### **❌ Incorrect Background Process Usage**
+```bash
+# WRONG: This creates nested backgrounding and orphaned processes
+Bash("npm run dev &", { run_in_background: true })
+
+# Problems:
+# - The & backgrounds the process within the bash shell
+# - run_in_background: true backgrounds the bash shell itself
+# - Killing the bash shell leaves npm/node processes running
+# - Ports remain occupied, preventing restart
+```
+
+#### **✅ Correct Background Process Usage**
+```bash
+# Option 1: Use run_in_background without &
+Bash("npm run dev", { run_in_background: true })
+
+# Option 2: Use process group management
+Bash("setsid npm run dev < /dev/null > /dev/null 2>&1 &", { run_in_background: true })
+
+# Option 3: Check and cleanup before starting
+Bash("pkill -f 'tsx.*monk-ftp' || true && npm run dev", { run_in_background: true })
+```
+
+#### **Process Cleanup Best Practices**
+```bash
+# Always check for orphaned processes after development
+ss -tlnp | grep :2121                    # Check if FTP port is occupied
+ps aux | grep -E "(tsx|node.*monk)"      # Check for running processes
+
+# Clean up orphaned processes
+pkill -f "tsx.*spec/helpers/filesystem-fake-api.ts"  # Kill fake API
+pkill -f "tsx.*src/index.ts"                         # Kill FTP server
+```
+
+### **FTP Command Implementation Pattern**
+
+When implementing new FTP commands (like CLNT), follow this established pattern:
+
+#### **1. Create Command Handler**
+```typescript
+// src/commands/newcommand.ts
+import { BaseFtpCommand } from '../lib/base-command.js';
+import type { FtpConnection } from '../lib/types.js';
+
+export class NewcommandCommand extends BaseFtpCommand {
+    readonly name = 'NEWCOMMAND';
+    readonly needsAuth = false; // or true if requires authentication
+    readonly needsDataConnection = false; // or true if needs data connection
+
+    async execute(connection: FtpConnection, args: string): Promise<void> {
+        // Command logic here
+        this.sendResponse(connection, 200, 'OK');
+    }
+}
+```
+
+#### **2. Update Type Definitions (if needed)**
+```typescript
+// src/lib/types.ts - Add new fields to FtpConnection if needed
+export interface FtpConnection {
+    // ... existing fields
+    newField?: string; // Add optional fields as needed
+}
+```
+
+#### **3. Register Command**
+```typescript
+// src/lib/ftp-server.ts
+// In loadCommandHandlers():
+const { NewcommandCommand } = await import('../commands/newcommand.js');
+this.registerCommand(new NewcommandCommand(this.config.apiUrl, this.config.debug));
+```
+
+#### **4. Update Help Command**
+```typescript
+// src/commands/help.ts
+const helpLines = [
+    '214-The following commands are supported:',
+    '214-USER PASS QUIT PWD CWD CDUP',
+    '214-LIST STAT SIZE MDTM PASV',
+    '214-STOR RETR DELE CLNT NEWCOMMAND', // Add to appropriate line
+    '214-SYST TYPE FEAT NOOP',
+    '214 Help OK'
+];
+```
+
+#### **5. Test Implementation**
+```bash
+# Compile to check for errors
+npm run compile
+
+# Test with netcat
+echo -e "NEWCOMMAND arg\r\nQUIT\r\n" | nc localhost 2121
+
+# Test with FTP clients
+ncftp -u root -p fake.jwt.token -P 2121 localhost
+```
+
+### **Recent Implementation: CLNT Command**
+
+The CLNT command was implemented following this pattern to resolve ncftp client compatibility:
+
+**Problem**: ncftp sends `CLNT NcFTP 3.2.6 linux-x86_64-glibc2.35` for client identification, receiving `502 Command not implemented`
+
+**Solution**: 
+- Created `src/commands/clnt.ts` with proper client identification handling
+- Added `clientInfo?: string` field to `FtpConnection` interface
+- Command stores client info and responds with `200 OK`
+- Added debug logging when client identification is received
+
+**Testing**:
+```bash
+# Before: 502 Command not implemented
+# After: 200 OK
+echo -e "CLNT NcFTP 3.2.6\r\nQUIT\r\n" | nc localhost 2121
+```
+
+### **Recent Implementation: FUSE Directory Detection Fix**
+
+The FUSE filesystem was incorrectly showing directories as files due to improper FTP protocol handling.
+
+**Problem**: `ls -la fuse/` showed:
+```bash
+-rw-r--r-- data  # File (incorrect)
+-rw-r--r-- meta  # File (incorrect)  
+```
+
+**Root Cause**: 
+- FTP SIZE command was returning success for directories
+- FUSE `getattr()` assumed anything with a valid SIZE response was a file
+- Always returned `S_IFREG` instead of proper `S_IFDIR`
+
+**Solution**: 
+1. **Fixed SIZE command** (src/commands/size.ts): Return `550 Not a file` for directories
+2. **Fixed FUSE detection** (src/utils/ftp-fuse-mount.py): Try CWD test when SIZE fails  
+3. **Added desktop probe suppression**: Reduced log noise from system file probes
+
+**Result**: `ls -la fuse/` now correctly shows:
+```bash  
+drwxr-xr-x data/  # Directory (correct)
+drwxr-xr-x meta/  # Directory (correct)
+find . # Complete tree traversal works
+```
+
+### **Development Workflow with Claude Code**
+
+#### **Starting Development**
+```bash
+# Always check for clean environment first
+ss -tlnp | grep :2121 || echo "Port available"
+
+# Start development environment (RECOMMENDED)
+npm run dev  # This handles both API and FTP server properly
+
+# Alternative: Individual servers for debugging
+npm run start:api:fs  # Filesystem-based fake API
+npm run start:dev     # FTP server with auto-reload
+```
+
+#### **Testing and Verification**
+```bash
+# Compile before testing
+npm run compile
+
+# Unit tests
+npm run spec:ts
+
+# Integration testing with real clients
+echo "USER root\r\nPASS fake.jwt.token\r\nLIST\r\nQUIT" | nc localhost 2121
+ncftp -u root -p fake.jwt.token -P 2121 localhost
+```
+
+#### **Cleanup After Development**
+```bash
+# Check for running processes
+ps aux | grep -E "(tsx|node.*monk)" | grep -v grep
+
+# Kill if needed
+pkill -f "tsx.*monk"
+
+# Verify ports are released
+ss -tlnp | grep :2121 || echo "Port 2121 available"
+ss -tlnp | grep :9001 || echo "Port 9001 available"
+```
 
 This guide provides everything needed to develop, test, and deploy the Monk FTP Server, from initial setup through production deployment.

@@ -10,7 +10,7 @@ import type { FtpConnection } from '../lib/types.js';
 export class ListCommand extends BaseFtpCommand {
     readonly name = 'LIST';
     readonly needsAuth = true;
-    readonly needsDataConnection = false; // Will create data connection if needed
+    readonly needsDataConnection = true; // Requires data connection from PASV
 
     async execute(connection: FtpConnection, args: string): Promise<void> {
         try {
@@ -32,9 +32,19 @@ export class ListCommand extends BaseFtpCommand {
                 // Format entries as FTP directory listing
                 const listing = this.formatFtpListing(response.entries);
                 
-                // Send listing directly over control connection (simplified for now)
+                // Send over data connection (proper FTP protocol)
                 this.sendResponse(connection, 150, 'Opening data connection');
-                connection.socket.write(listing + '\r\n');
+                
+                // Send listing over data connection
+                if (connection.dataConnection?.socket) {
+                    connection.dataConnection.socket.write(listing);
+                    connection.dataConnection.socket.end();
+                } else {
+                    console.error('❌ No data connection socket available');
+                    this.sendResponse(connection, 425, 'Cannot open data connection');
+                    return;
+                }
+                
                 this.sendResponse(connection, 226, `Directory listing completed (${response.entries.length} entries)`);
                 
             } else {

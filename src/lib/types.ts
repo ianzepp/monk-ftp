@@ -11,6 +11,7 @@ export interface FtpConnection {
     authenticated: boolean;
     currentPath: string;
     jwtToken?: string;
+    clientInfo?: string;
     dataConnection?: {
         server?: net.Server;
         socket?: net.Socket;

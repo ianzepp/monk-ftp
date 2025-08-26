@@ -25,9 +25,9 @@ from datetime import datetime
 from typing import Dict, List, Optional
 
 try:
-    from fuse import FUSE, FuseOSError, Operations
+    from fusepy import FUSE, FuseOSError, Operations
 except ImportError:
-    print("Error: fusepy not installed. Install with: pip install fusepy")
+    print("Error: fusepy not installed. Install with: sudo apt install python3-fusepy")
     sys.exit(1)
 
 
@@ -125,6 +125,14 @@ class FtpFuseOperations(Operations):
     
     def getattr(self, path: str, fh=None) -> Dict:
         """Get file/directory attributes"""
+        # Suppress common desktop environment probes to reduce log noise
+        desktop_probes = [
+            '/.Trash', '/.Trash-1000', '/.xdg-volume-info', '/autorun.inf',
+            '/.directory', '/.DS_Store', '/Thumbs.db', '/desktop.ini'
+        ]
+        if path in desktop_probes:
+            raise FuseOSError(errno.ENOENT)
+        
         try:
             if path == '/':
                 # Root directory
@@ -140,37 +148,61 @@ class FtpFuseOperations(Operations):
             # Use FTP STAT command for file information
             ftp = self._get_ftp_connection()
             
-            # Try to get file info via SIZE and MDTM commands
+            # Try SIZE first - if it works, it's likely a file
             try:
                 size_resp = ftp.sendcmd(f'SIZE {path}')
-                file_size = int(size_resp.split()[1]) if size_resp.startswith('213') else 0
-            except:
-                file_size = 0
-            
-            try:
-                mdtm_resp = ftp.sendcmd(f'MDTM {path}')
-                # Parse MDTM timestamp: 213 20250825151723
-                if mdtm_resp.startswith('213'):
-                    timestamp_str = mdtm_resp.split()[1]
-                    # Convert YYYYMMDDHHMMSS to timestamp
-                    dt = datetime.strptime(timestamp_str, '%Y%m%d%H%M%S')
-                    mtime = int(dt.timestamp())
+                if size_resp.startswith('213'):
+                    file_size = int(size_resp.split()[1])
+                    
+                    # Get modification time
+                    try:
+                        mdtm_resp = ftp.sendcmd(f'MDTM {path}')
+                        if mdtm_resp.startswith('213'):
+                            timestamp_str = mdtm_resp.split()[1]
+                            dt = datetime.strptime(timestamp_str, '%Y%m%d%H%M%S')
+                            mtime = int(dt.timestamp())
+                        else:
+                            mtime = int(datetime.now().timestamp())
+                    except:
+                        mtime = int(datetime.now().timestamp())
+                    
+                    ftp.quit()
+                    
+                    # It's a file
+                    return {
+                        'st_mode': stat.S_IFREG | 0o644,
+                        'st_nlink': 1,
+                        'st_size': file_size,
+                        'st_ctime': mtime,
+                        'st_mtime': mtime,
+                        'st_atime': mtime
+                    }
                 else:
-                    mtime = int(datetime.now().timestamp())
+                    raise Exception("SIZE command failed")
+                    
             except:
-                mtime = int(datetime.now().timestamp())
-            
-            ftp.quit()
-            
-            # Assume it's a file if we got here
-            return {
-                'st_mode': stat.S_IFREG | 0o644,
-                'st_nlink': 1,
-                'st_size': file_size,
-                'st_ctime': mtime,
-                'st_mtime': mtime,
-                'st_atime': mtime
-            }
+                # SIZE failed - might be a directory
+                try:
+                    current_dir = ftp.pwd()
+                    ftp.cwd(path)  # Try to change to directory
+                    ftp.cwd(current_dir)  # Change back to original directory
+                    
+                    ftp.quit()
+                    
+                    # It's a directory
+                    return {
+                        'st_mode': stat.S_IFDIR | 0o755,
+                        'st_nlink': 2,
+                        'st_size': 0,
+                        'st_ctime': int(datetime.now().timestamp()),
+                        'st_mtime': int(datetime.now().timestamp()),
+                        'st_atime': int(datetime.now().timestamp())
+                    }
+                    
+                except:
+                    ftp.quit()
+                    # Neither file nor directory - not found
+                    raise FuseOSError(errno.ENOENT)
             
         except ftplib.error_perm as e:
             if '550' in str(e):

@@ -7,9 +7,11 @@ import { MonkApiClient } from './api-client.js';
 
 export abstract class BaseFtpCommand implements FtpCommandHandler {
     protected apiClient: MonkApiClient;
+    protected debug: boolean;
 
     constructor(apiUrl: string, debug: boolean = false) {
         this.apiClient = new MonkApiClient(apiUrl, debug);
+        this.debug = debug;
     }
 
     abstract readonly name: string;
