@@ -58,4 +58,12 @@ export class MonkApiClient {
     async append(path: string, content: any, options: any, jwtToken: string): Promise<any> {
         return this.callFtpEndpoint('append', { path, content, ftp_options: options }, jwtToken);
     }
+
+    async size(path: string, jwtToken: string): Promise<any> {
+        return this.callFtpEndpoint('size', { path }, jwtToken);
+    }
+
+    async modifyTime(path: string, jwtToken: string): Promise<any> {
+        return this.callFtpEndpoint('modify-time', { path }, jwtToken);
+    }
 }

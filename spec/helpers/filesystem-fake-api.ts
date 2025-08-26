@@ -79,6 +79,10 @@ export class FilesystemFakeApi {
                 await this.handleFtpStat(req, res, body);
             } else if (url.pathname === '/ftp/append' && req.method === 'POST') {
                 await this.handleFtpAppend(req, res, body);
+            } else if (url.pathname === '/ftp/size' && req.method === 'POST') {
+                await this.handleFtpSize(req, res, body);
+            } else if (url.pathname === '/ftp/modify-time' && req.method === 'POST') {
+                await this.handleFtpModifyTime(req, res, body);
             } else if (url.pathname === '/health' && req.method === 'GET') {
                 this.sendJsonResponse(res, 200, { status: 'ok', server: 'filesystem-fake-api' });
             } else {
@@ -498,6 +502,80 @@ export class FilesystemFakeApi {
             
         } catch (error) {
             throw new Error(`Path not found: ${ftpPath}`);
+        }
+    }
+
+    private async handleFtpSize(req: http.IncomingMessage, res: http.ServerResponse, body: any): Promise<void> {
+        const { path: ftpPath } = body;
+        
+        if (!this.isAuthenticated(req)) {
+            this.sendJsonResponse(res, 401, { error: 'Authentication required' });
+            return;
+        }
+
+        try {
+            const stats = await this.getPathStats(ftpPath);
+            
+            if (stats.isDirectory()) {
+                this.sendJsonResponse(res, 200, {
+                    success: false,
+                    error: 'not_a_file',
+                    message: 'SIZE command only works on files, not directories',
+                    path: ftpPath,
+                    ftp_code: 550
+                });
+            } else {
+                this.sendJsonResponse(res, 200, {
+                    success: true,
+                    size: stats.size,
+                    path: ftpPath,
+                    content_info: {
+                        type: 'file',
+                        encoding: 'utf8',
+                        estimated: false
+                    }
+                });
+            }
+        } catch (error) {
+            this.sendJsonResponse(res, 200, {
+                success: false,
+                error: 'file_not_found',
+                message: 'File does not exist',
+                path: ftpPath,
+                ftp_code: 550
+            });
+        }
+    }
+
+    private async handleFtpModifyTime(req: http.IncomingMessage, res: http.ServerResponse, body: any): Promise<void> {
+        const { path: ftpPath } = body;
+        
+        if (!this.isAuthenticated(req)) {
+            this.sendJsonResponse(res, 401, { error: 'Authentication required' });
+            return;
+        }
+
+        try {
+            const stats = await this.getPathStats(ftpPath);
+            
+            this.sendJsonResponse(res, 200, {
+                success: true,
+                modified_time: this.dateToFtpTimestamp(stats.mtime),
+                path: ftpPath,
+                timestamp_info: {
+                    source: 'updated_at',
+                    iso_timestamp: stats.mtime.toISOString(),
+                    timezone: 'UTC'
+                }
+            });
+        } catch (error) {
+            this.sendJsonResponse(res, 200, {
+                success: false,
+                error: 'file_not_found',
+                message: 'File or directory does not exist',
+                path: ftpPath,
+                ftp_code: 550
+            });
         }
     }
 }

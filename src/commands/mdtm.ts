@@ -1,7 +1,7 @@
 /**
  * MDTM command handler - File modification time query
  * 
- * Thin wrapper around STAT command to extract just the modification time
+ * Uses dedicated /ftp/modify-time endpoint for optimized timestamp queries
  */
 
 import { BaseFtpCommand } from '../lib/base-command.js';
@@ -22,14 +22,21 @@ export class MdtmCommand extends BaseFtpCommand {
             // Resolve file path
             const filePath = this.resolvePath(connection.currentPath, args);
             
-            // Call monk-api /ftp/stat endpoint (reuse STAT logic)
-            const response = await this.apiClient.stat(filePath, connection.jwtToken!);
+            // Call monk-api /ftp/modify-time endpoint (dedicated lightweight endpoint)
+            const response = await this.apiClient.modifyTime(filePath, connection.jwtToken!);
 
             if (response.success) {
-                // Return just the modification time
+                // Return the modification time in FTP format
                 this.sendResponse(connection, 213, response.modified_time);
             } else {
-                this.sendResponse(connection, 550, 'File modification time not available');
+                // Handle error responses based on error type
+                if (response.error === 'file_not_found') {
+                    this.sendResponse(connection, 550, 'File not found');
+                } else if (response.error === 'permission_denied') {
+                    this.sendResponse(connection, 550, 'Permission denied');
+                } else {
+                    this.sendResponse(connection, 550, 'File modification time not available');
+                }
             }
             
         } catch (error) {

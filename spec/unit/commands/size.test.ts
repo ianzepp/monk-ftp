@@ -3,12 +3,11 @@ import { SizeCommand } from '@src/commands/size.js';
 import { createMockConnection, getLastResponse, createTestCommand } from '@spec/helpers/command-test-helper.js';
 
 describe('SIZE command', () => {
-    test('should return file size from STAT response', async () => {
+    test('should return file size from dedicated size endpoint', async () => {
         const { command } = createTestCommand(SizeCommand, {
-            stat: {
+            size: {
                 success: true,
-                size: 290,
-                type: 'file'
+                size: 290
             }
         });
         
@@ -25,10 +24,9 @@ describe('SIZE command', () => {
 
     test('should handle relative path resolution', async () => {
         const { command, mockApi } = createTestCommand(SizeCommand, {
-            stat: {
+            size: {
                 success: true,
-                size: 17,
-                type: 'file'
+                size: 17
             }
         });
         
@@ -49,7 +47,7 @@ describe('SIZE command', () => {
 
     test('should handle absolute paths', async () => {
         const { command, mockApi } = createTestCommand(SizeCommand, {
-            stat: {
+            size: {
                 success: true,
                 size: 1024
             }
@@ -84,7 +82,7 @@ describe('SIZE command', () => {
         
         // Mock API client to throw 404 error
         (command as any).apiClient = {
-            stat: async () => {
+            size: async () => {
                 throw new Error('404 Not found');
             }
         };
@@ -99,7 +97,7 @@ describe('SIZE command', () => {
 
     test('should handle API failure', async () => {
         const { command } = createTestCommand(SizeCommand, {
-            stat: {
+            size: {
                 success: false
             }
         });

@@ -1,7 +1,7 @@
 /**
  * SIZE command handler - File size query
  * 
- * Thin wrapper around STAT command to extract just the file size
+ * Uses dedicated /ftp/size endpoint for optimized file size queries
  */
 
 import { BaseFtpCommand } from '../lib/base-command.js';
@@ -22,19 +22,23 @@ export class SizeCommand extends BaseFtpCommand {
             // Resolve file path
             const filePath = this.resolvePath(connection.currentPath, args);
             
-            // Call monk-api /ftp/stat endpoint (reuse STAT logic)
-            const response = await this.apiClient.stat(filePath, connection.jwtToken!);
+            // Call monk-api /ftp/size endpoint (dedicated lightweight endpoint)
+            const response = await this.apiClient.size(filePath, connection.jwtToken!);
 
             if (response.success) {
-                // Check if it's a directory - SIZE command should only work on files
-                if (response.type === 'directory') {
-                    this.sendResponse(connection, 550, 'Not a file');
-                } else {
-                    // Return just the size
-                    this.sendResponse(connection, 213, response.size.toString());
-                }
+                // Return the file size
+                this.sendResponse(connection, 213, response.size.toString());
             } else {
-                this.sendResponse(connection, 550, 'File size not available');
+                // Handle error responses based on error type
+                if (response.error === 'not_a_file') {
+                    this.sendResponse(connection, 550, 'Not a file');
+                } else if (response.error === 'file_not_found') {
+                    this.sendResponse(connection, 550, 'File not found');
+                } else if (response.error === 'permission_denied') {
+                    this.sendResponse(connection, 550, 'Permission denied');
+                } else {
+                    this.sendResponse(connection, 550, 'File size not available');
+                }
             }
             
         } catch (error) {
