@@ -11,9 +11,21 @@ export class FtpServer {
     private server: net.Server;
     private connections = new Map<string, FtpConnection>();
     private commandHandlers = new Map<string, FtpCommandHandler>();
+    
+    // Rate limiting state
+    private connectionAttempts = new Map<string, number>();
+    private authFailures = new Map<string, number>();
+    
+    // Rate limiting configuration
+    private readonly MAX_CONNECTIONS_PER_IP_PER_MINUTE = 10;
+    private readonly MAX_AUTH_FAILURES_PER_IP_PER_5MIN = 3;
+    private readonly CLEANUP_INTERVAL = 300000; // 5 minutes
 
     constructor(private config: ServerConfig) {
         this.server = net.createServer(this.handleConnection.bind(this));
+        
+        // Setup periodic cleanup of rate limiting maps
+        setInterval(() => this.cleanupRateLimitMaps(), this.CLEANUP_INTERVAL);
     }
 
     async start(): Promise<void> {
@@ -78,6 +90,16 @@ export class FtpServer {
         const connectionId = `ftp-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
         const clientIp = socket.remoteAddress || 'unknown';
         
+        // Rate limiting check
+        if (!this.checkConnectionRateLimit(clientIp)) {
+            socket.write('421 Service not available, too many connections from your IP\r\n');
+            socket.destroy();
+            if (this.config.debug) {
+                console.log(`🚫 [${clientIp}] Rate limited - too many connections`);
+            }
+            return;
+        }
+        
         console.log(`📞 New FTP connection from ${clientIp} (${connectionId})`);
 
         const connection: FtpConnection = {
@@ -123,19 +145,40 @@ export class FtpServer {
             const handler = this.commandHandlers.get(command);
             
             if (handler) {
-                // Check authentication requirement
+                // Enhanced built-in security checks:
+                
+                // 1. Authentication check (existing)
                 if (handler.needsAuth && !connection.authenticated) {
+                    // Check auth rate limiting for PASS commands
+                    if (command === 'PASS' && !this.checkAuthRateLimit(connection)) {
+                        return; // Already sent rate limit response
+                    }
                     this.sendResponse(connection, 530, 'Please login first');
                     return;
                 }
                 
-                // Check data connection requirement
+                // 2. Data connection check (existing)  
                 if (handler.needsDataConnection && !connection.dataConnection) {
                     this.sendResponse(connection, 425, 'Use PASV first');
                     return;
                 }
                 
+                // 3. Path validation check (new)
+                if (args && !this.validatePath(args)) {
+                    this.sendResponse(connection, 553, 'Invalid path');
+                    return;
+                }
+                
+                // Track auth state before PASS command execution
+                const wasAuthenticated = connection.authenticated;
+                
                 await handler.execute(connection, args);
+                
+                // Record authentication failure for PASS command if auth failed
+                if (command === 'PASS' && !wasAuthenticated && !connection.authenticated) {
+                    this.recordAuthFailure(connection);
+                }
+                
             } else {
                 // Handle basic system commands
                 await this.handleSystemCommand(connection, command, args);
@@ -232,6 +275,102 @@ export class FtpServer {
         } catch (error) {
             console.error(`❌ Failed to register command '${name}':`, error);
             throw error;
+        }
+    }
+
+    private checkConnectionRateLimit(clientIp: string): boolean {
+        const now = Date.now();
+        const key = `${clientIp}:${Math.floor(now / 60000)}`; // 1-minute buckets
+        const count = this.connectionAttempts.get(key) || 0;
+        
+        if (count >= this.MAX_CONNECTIONS_PER_IP_PER_MINUTE) {
+            return false;
+        }
+        
+        this.connectionAttempts.set(key, count + 1);
+        return true;
+    }
+
+    private checkAuthRateLimit(connection: FtpConnection): boolean {
+        const clientIp = connection.socket.remoteAddress || 'unknown';
+        const now = Date.now();
+        const key = `${clientIp}:auth:${Math.floor(now / 300000)}`; // 5-minute buckets
+        const failures = this.authFailures.get(key) || 0;
+        
+        if (failures >= this.MAX_AUTH_FAILURES_PER_IP_PER_5MIN) {
+            this.sendResponse(connection, 421, 'Too many authentication failures, try again later');
+            this.closeConnection(connection);
+            return false;
+        }
+        
+        return true;
+    }
+    
+    recordAuthFailure(connection: FtpConnection): void {
+        const clientIp = connection.socket.remoteAddress || 'unknown';
+        const now = Date.now();
+        const key = `${clientIp}:auth:${Math.floor(now / 300000)}`;
+        const failures = this.authFailures.get(key) || 0;
+        this.authFailures.set(key, failures + 1);
+    }
+
+    private validatePath(path: string): boolean {
+        // Handle null/undefined/empty paths
+        if (!path || typeof path !== 'string') {
+            return false;
+        }
+        
+        // Normalize path - handle multiple slashes
+        const normalizedPath = path.replace(/\/+/g, '/');
+        
+        // Block directory traversal attempts
+        if (normalizedPath.includes('/../') || 
+            normalizedPath.startsWith('../') || 
+            normalizedPath.endsWith('/..')) {
+            return false;
+        }
+        
+        // Block malformed paths (Windows-style, null bytes, newlines)
+        if (normalizedPath.includes('\\') || 
+            normalizedPath.includes('\x00') || 
+            normalizedPath.includes('\n')) {
+            return false;
+        }
+        
+        // Require absolute paths (must start with /)
+        if (!normalizedPath.startsWith('/')) {
+            return false;
+        }
+        
+        // Only allow paths under monk-api structure
+        return normalizedPath.startsWith('/data/') || 
+               normalizedPath.startsWith('/meta/') ||
+               normalizedPath === '/data' || 
+               normalizedPath === '/meta' ||
+               normalizedPath === '/';
+    }
+
+    private cleanupRateLimitMaps(): void {
+        const now = Date.now();
+        
+        // Clean connection attempts older than 1 minute
+        for (const [key, value] of this.connectionAttempts) {
+            const bucketTime = parseInt(key.split(':')[1]) * 60000;
+            if (now - bucketTime > 60000) {
+                this.connectionAttempts.delete(key);
+            }
+        }
+        
+        // Clean auth failures older than 5 minutes  
+        for (const [key] of this.authFailures) {
+            const bucketTime = parseInt(key.split(':')[2]) * 300000;
+            if (now - bucketTime > 300000) {
+                this.authFailures.delete(key);
+            }
+        }
+        
+        if (this.config.debug) {
+            console.log(`🧹 Cleanup: ${this.connectionAttempts.size} connection buckets, ${this.authFailures.size} auth failure buckets`);
         }
     }
 
