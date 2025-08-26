@@ -54,4 +54,8 @@ export class MonkApiClient {
     async stat(path: string, jwtToken: string): Promise<any> {
         return this.callFtpEndpoint('stat', { path }, jwtToken);
     }
+
+    async append(path: string, content: any, options: any, jwtToken: string): Promise<any> {
+        return this.callFtpEndpoint('append', { path, content, ftp_options: options }, jwtToken);
+    }
 }

@@ -77,6 +77,8 @@ export class FilesystemFakeApi {
                 await this.handleFtpDelete(req, res, body);
             } else if (url.pathname === '/ftp/stat' && req.method === 'POST') {
                 await this.handleFtpStat(req, res, body);
+            } else if (url.pathname === '/ftp/append' && req.method === 'POST') {
+                await this.handleFtpAppend(req, res, body);
             } else if (url.pathname === '/health' && req.method === 'GET') {
                 this.sendJsonResponse(res, 200, { status: 'ok', server: 'filesystem-fake-api' });
             } else {
@@ -182,6 +184,39 @@ export class FilesystemFakeApi {
         }
     }
 
+    private async handleFtpAppend(req: http.IncomingMessage, res: http.ServerResponse, body: any): Promise<void> {
+        const { path: ftpPath, content } = body;
+        
+        if (!this.isAuthenticated(req)) {
+            this.sendJsonResponse(res, 401, { error: 'Authentication required' });
+            return;
+        }
+
+        try {
+            await this.appendToFile(ftpPath, content);
+            
+            this.sendJsonResponse(res, 200, {
+                success: true,
+                operation: 'append',
+                result: {
+                    record_id: this.extractRecordId(ftpPath),
+                    appended: true,
+                    validation_passed: true
+                },
+                ftp_metadata: {
+                    modified_time: this.getCurrentTimestamp(),
+                    permissions: 'rw-',
+                    etag: Math.random().toString(36).substr(2, 12)
+                }
+            });
+        } catch (error) {
+            this.sendJsonResponse(res, 500, { 
+                success: false, 
+                error: error instanceof Error ? error.message : 'Append failed' 
+            });
+        }
+    }
+
     private async handleFtpDelete(req: http.IncomingMessage, res: http.ServerResponse, body: any): Promise<void> {
         const { path: ftpPath } = body;
         
@@ -267,6 +302,22 @@ export class FilesystemFakeApi {
         } else {
             // Individual field
             await fs.writeFile(fullPath, String(content));
+        }
+    }
+
+    private async appendToFile(ftpPath: string, content: any): Promise<void> {
+        const fsPath = this.ftpPathToFilesystem(ftpPath);
+        const fullPath = path.join(this.dataPath, fsPath);
+
+        if (ftpPath.endsWith('.json')) {
+            // For JSON files, append is more complex - would need to merge objects
+            // For now, just append the content as string (simplified)
+            const existingContent = await fs.readFile(fullPath, 'utf-8').catch(() => '{}');
+            const newContent = existingContent.trimEnd() + '\n' + JSON.stringify(content, null, 2);
+            await fs.writeFile(fullPath, newContent);
+        } else {
+            // Individual field - append content
+            await fs.appendFile(fullPath, String(content));
         }
     }
 

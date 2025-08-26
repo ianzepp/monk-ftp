@@ -417,16 +417,17 @@ DEBUG=monk-ftp:*
 - **Authentication**: USER, PASS, QUIT (JWT token validation)
 - **Navigation**: PWD, CWD, CDUP (directory operations with API validation)
 - **Information**: LIST, STAT, SIZE, MDTM, HELP, CLNT (complete metadata support)
-- **Data Transfer**: PASV, STOR, RETR (complete file transfer implementation)
+- **Data Transfer**: PASV, STOR, RETR, APPE (complete file transfer implementation)
 - **System**: SYST, TYPE, FEAT, NOOP (protocol compliance)
 
 ### **Complete Implementation** ✅
-- **15 FTP Commands**: Full command set covering authentication, navigation, file operations
+- **16 FTP Commands**: Full command set covering authentication, navigation, file operations
 - **Data Connections**: PASV mode with proper port allocation and client handling
-- **File Transfers**: Complete STOR/RETR implementation with monk-api integration
+- **File Transfers**: Complete STOR/RETR/APPE implementation with monk-api integration
 - **Protocol Compliance**: RFC 959 compliance with proper response codes and formats
 - **Client Compatibility**: Full ncftp support with CLNT command identification
 - **FUSE Filesystem**: Working directory/file detection with Unix tool compatibility
+- **Simplified Architecture**: String-based command registration with auto-discovery
 
 ### **Future Features** 📋
 - **Data Connection Management**: PASV/PORT modes for file transfers
@@ -653,8 +654,7 @@ export interface FtpConnection {
 ```typescript
 // src/lib/ftp-server.ts
 // In loadCommandHandlers():
-const { NewcommandCommand } = await import('../commands/newcommand.js');
-this.registerCommand(new NewcommandCommand(this.config.apiUrl, this.config.debug));
+await this.registerCommand('newcommand');
 ```
 
 #### **4. Update Help Command**
@@ -701,24 +701,28 @@ The CLNT command was implemented following this pattern to resolve ncftp client 
 echo -e "CLNT NcFTP 3.2.6\r\nQUIT\r\n" | nc localhost 2121
 ```
 
-### **Recent Implementation: FUSE Directory Detection Fix**
+### **Version 1.0.0 Release Implementation**
 
-The FUSE filesystem was incorrectly showing directories as files due to improper FTP protocol handling.
+The monk-ftp server reached 1.0.0 milestone with complete FTP protocol compliance, client compatibility, and FUSE filesystem integration.
 
+#### **Major Features Completed:**
+
+1. **CLNT Command**: Client identification support for ncftp and other FTP clients
+2. **APPE Command**: File append operations for database field updates  
+3. **FUSE Directory Detection**: Fixed filesystem showing directories as files
+4. **Simplified Command Registration**: String-based auto-discovery pattern
+5. **Complete Test Coverage**: 39+ unit tests with 1:1 command-to-test mapping
+
+#### **FUSE Directory Detection Fix:**
 **Problem**: `ls -la fuse/` showed:
 ```bash
 -rw-r--r-- data  # File (incorrect)
 -rw-r--r-- meta  # File (incorrect)  
 ```
 
-**Root Cause**: 
-- FTP SIZE command was returning success for directories
-- FUSE `getattr()` assumed anything with a valid SIZE response was a file
-- Always returned `S_IFREG` instead of proper `S_IFDIR`
-
 **Solution**: 
-1. **Fixed SIZE command** (src/commands/size.ts): Return `550 Not a file` for directories
-2. **Fixed FUSE detection** (src/utils/ftp-fuse-mount.py): Try CWD test when SIZE fails  
+1. **Fixed SIZE command**: Return `550 Not a file` for directories (RFC compliance)
+2. **Fixed FUSE detection**: Try CWD test when SIZE fails  
 3. **Added desktop probe suppression**: Reduced log noise from system file probes
 
 **Result**: `ls -la fuse/` now correctly shows:
@@ -727,6 +731,11 @@ drwxr-xr-x data/  # Directory (correct)
 drwxr-xr-x meta/  # Directory (correct)
 find . # Complete tree traversal works
 ```
+
+#### **Architecture Improvements:**
+- **Command Registration**: Simplified from 32 lines to 16 lines with auto-discovery
+- **Test Coverage**: Added comprehensive tests for new commands
+- **Documentation**: Complete Claude Code development guidelines
 
 ### **Development Workflow with Claude Code**
 
