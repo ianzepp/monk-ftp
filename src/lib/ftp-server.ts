@@ -59,24 +59,42 @@ export class FtpServer {
     }
 
     private async loadCommandHandlers(): Promise<void> {
-        // Load command handlers using simplified registration
+        // Load command handlers (explicit imports for test compatibility)
         try {
-            await this.registerCommand('user');
-            await this.registerCommand('pass');
-            await this.registerCommand('pwd');
-            await this.registerCommand('cwd');
-            await this.registerCommand('list');
-            await this.registerCommand('stor');
-            await this.registerCommand('retr');
-            await this.registerCommand('dele');
-            await this.registerCommand('stat');
-            await this.registerCommand('cdup');
-            await this.registerCommand('size');
-            await this.registerCommand('mdtm');
-            await this.registerCommand('pasv');
-            await this.registerCommand('help');
-            await this.registerCommand('clnt');
-            await this.registerCommand('appe');
+            const { UserCommand } = await import('../commands/user.js');
+            const { PassCommand } = await import('../commands/pass.js');
+            const { PwdCommand } = await import('../commands/pwd.js');
+            const { CwdCommand } = await import('../commands/cwd.js');
+            const { ListCommand } = await import('../commands/list.js');
+            const { StorCommand } = await import('../commands/stor.js');
+            const { RetrCommand } = await import('../commands/retr.js');
+            const { DeleCommand } = await import('../commands/dele.js');
+            const { StatCommand } = await import('../commands/stat.js');
+            const { CdupCommand } = await import('../commands/cdup.js');
+            const { SizeCommand } = await import('../commands/size.js');
+            const { MdtmCommand } = await import('../commands/mdtm.js');
+            const { PasvCommand } = await import('../commands/pasv.js');
+            const { HelpCommand } = await import('../commands/help.js');
+            const { ClntCommand } = await import('../commands/clnt.js');
+            const { AppeCommand } = await import('../commands/appe.js');
+
+            // Register commands using new method (backwards compatible)
+            await this.registerCommand(new UserCommand(this.config.apiUrl, this.config.debug));
+            await this.registerCommand(new PassCommand(this.config.apiUrl, this.config.debug));
+            await this.registerCommand(new PwdCommand(this.config.apiUrl, this.config.debug));
+            await this.registerCommand(new CwdCommand(this.config.apiUrl, this.config.debug));
+            await this.registerCommand(new ListCommand(this.config.apiUrl, this.config.debug));
+            await this.registerCommand(new StorCommand(this.config.apiUrl, this.config.debug));
+            await this.registerCommand(new RetrCommand(this.config.apiUrl, this.config.debug));
+            await this.registerCommand(new DeleCommand(this.config.apiUrl, this.config.debug));
+            await this.registerCommand(new StatCommand(this.config.apiUrl, this.config.debug));
+            await this.registerCommand(new CdupCommand(this.config.apiUrl, this.config.debug));
+            await this.registerCommand(new SizeCommand(this.config.apiUrl, this.config.debug));
+            await this.registerCommand(new MdtmCommand(this.config.apiUrl, this.config.debug));
+            await this.registerCommand(new PasvCommand(this.config.apiUrl, this.config.debug));
+            await this.registerCommand(new HelpCommand(this.config.apiUrl, this.config.debug));
+            await this.registerCommand(new ClntCommand(this.config.apiUrl, this.config.debug));
+            await this.registerCommand(new AppeCommand(this.config.apiUrl, this.config.debug));
 
             if (this.config.debug) {
                 console.log(`📋 Command handlers loaded: ${this.commandHandlers.size}`);
@@ -253,28 +271,38 @@ export class FtpServer {
         this.closeConnection(connection);
     }
 
-    async registerCommand(commandName: string): Promise<void> {
-        // String-based registration - discover and load the command
-        const name = commandName.toLowerCase();
-        const className = name.charAt(0).toUpperCase() + name.slice(1) + 'Command';
-        
-        try {
-            const module = await import(`../commands/${name}.js`);
-            const CommandClass = module[className];
+    async registerCommand(commandNameOrHandler: string | FtpCommandHandler): Promise<void> {
+        // Support both string-based registration and direct handler registration
+        if (typeof commandNameOrHandler === 'string') {
+            // String-based registration - discover and load the command
+            const name = commandNameOrHandler.toLowerCase();
+            const className = name.charAt(0).toUpperCase() + name.slice(1) + 'Command';
             
-            if (!CommandClass) {
-                throw new Error(`Command class ${className} not found in ${name}.js`);
+            try {
+                const module = await import(`../commands/${name}.js`);
+                const CommandClass = module[className];
+                
+                if (!CommandClass) {
+                    throw new Error(`Command class ${className} not found in ${name}.js`);
+                }
+                
+                const handler = new CommandClass(this.config.apiUrl, this.config.debug);
+                this.commandHandlers.set(handler.name, handler);
+                
+                if (this.config.debug) {
+                    console.log(`📋 Registered command: ${handler.name}`);
+                }
+            } catch (error) {
+                console.error(`❌ Failed to register command '${name}':`, error);
+                throw error;
             }
-            
-            const handler = new CommandClass(this.config.apiUrl, this.config.debug);
+        } else {
+            // Direct handler registration (for testing)
+            const handler = commandNameOrHandler;
             this.commandHandlers.set(handler.name, handler);
-            
             if (this.config.debug) {
                 console.log(`📋 Registered command: ${handler.name}`);
             }
-        } catch (error) {
-            console.error(`❌ Failed to register command '${name}':`, error);
-            throw error;
         }
     }
 
