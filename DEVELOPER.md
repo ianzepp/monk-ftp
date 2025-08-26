@@ -112,18 +112,19 @@ MONK_JWT_TOKEN=<your-jwt-token>
 - ✅ **STAT**: File/directory status (multi-line FTP format)
 - ✅ **CLNT**: Client identification (logging/debugging)
 
-#### **File Operations** ⏳
-- ⏳ **RETR**: File download (needs data connection)
-- ⏳ **STOR**: File upload (needs data connection)
-- ⏳ **DELE**: File deletion (basic implementation, needs enhancement)
-- ⏳ **SIZE**: File size query (can use STAT for now)
-- ⏳ **MDTM**: File modification time (can use STAT for now)
+#### **File Operations** ✅
+- ✅ **RETR**: File download (complete data connection implementation)
+- ✅ **STOR**: File upload (complete data connection implementation)  
+- ✅ **APPE**: File append (complete data connection implementation)
+- ✅ **DELE**: File deletion (complete monk-api integration)
+- ✅ **SIZE**: File size query (complete with directory rejection)
+- ✅ **MDTM**: File modification time (complete monk-api integration)
 
-#### **Data Connection Commands** 📋
-- 📋 **PASV**: Passive mode data connection (needed for STOR/RETR)
-- 📋 **EPSV**: Extended passive mode (needed for STOR/RETR)
-- 📋 **PORT**: Active mode (planned)
-- 📋 **EPRT**: Extended active mode (planned)
+#### **Data Connection Commands** ✅
+- ✅ **PASV**: Passive mode data connection (complete implementation)
+- ⏳ **EPSV**: Extended passive mode (future enhancement)
+- ⏳ **PORT**: Active mode (future enhancement)  
+- ⏳ **EPRT**: Extended active mode (future enhancement)
 
 #### **System Commands** ✅
 - ✅ **SYST**: System type identification
@@ -289,6 +290,7 @@ echo "USER root\r\nPASS fake.jwt.token\r\nLIST\r\nSTAT /data/\r\nQUIT" | nc loca
 - ✅ **PASV** → 227 Entering passive mode (127,0,0,1,p1,p2)
 - ✅ **HELP** → Multi-line command list for client compatibility
 - ✅ **CLNT NcFTP 3.2.6** → 200 OK (client identification)
+- ✅ **APPE /file.txt** → 425 Use PASV first (file append)
 
 #### **Real Data Integration:**
 - **Schema level**: `/data/` shows `accounts`, `contacts`, `users`
@@ -297,11 +299,11 @@ echo "USER root\r\nPASS fake.jwt.token\r\nLIST\r\nSTAT /data/\r\nQUIT" | nc loca
 - **Metadata**: Real file sizes (290 bytes JSON, 17 bytes email field)
 
 ### **Testing Infrastructure** 
-- **30+ tests**: Unit tests for all commands with comprehensive coverage
+- **68+ tests**: Unit tests for all commands with comprehensive coverage including security
 - **23 test files**: Realistic monk-api data patterns with UUIDs and field-per-file structure
 - **Filesystem-based API**: Real file operations reading from `spec/test-data/`
 - **Integration testing**: Complete FTP protocol validation with real clients
-- **Multiple test modes**: Static responses + filesystem-based responses
+- **Security testing**: Rate limiting and path validation with 29 dedicated tests
 - **Command testing**: 1:1 mapping (src/commands/X.ts → spec/unit/commands/X.test.ts)
 
 #### **Test Data Structure** (`spec/test-data/`)
@@ -332,17 +334,21 @@ meta/schema/                         # Schema definitions
 
 ### **TypeScript Testing (vitest)**
 ```bash
-# All TypeScript tests
+# All TypeScript tests (68+ tests)
 npm run spec:ts
 
-# Unit tests only
+# Unit tests only  
 npm run spec:ts unit
+
+# Security tests (29 tests)
+npm run spec:ts rate-limiting
 
 # Integration tests  
 npm run spec:ts integration
 
-# Specific test file
-npm run spec:ts spec/unit/protocol.test.ts
+# Specific command tests
+npm run spec:ts commands/clnt
+npm run spec:ts commands/appe
 ```
 
 ### **Shell Testing (Future)**
@@ -429,12 +435,19 @@ DEBUG=monk-ftp:*
 - **FUSE Filesystem**: Working directory/file detection with Unix tool compatibility
 - **Simplified Architecture**: String-based command registration with auto-discovery
 
+### **Security Features** ✅
+- **Connection Rate Limiting**: 10 connections per minute per IP with automatic cleanup
+- **Authentication Rate Limiting**: 3 auth failures per 5 minutes per IP
+- **Path Validation**: Directory traversal protection and malformed path blocking
+- **Memory Management**: Automatic cleanup of rate limiting state every 5 minutes
+- **Standard Responses**: Proper FTP 421/553 error codes for security violations
+
 ### **Future Features** 📋
-- **Data Connection Management**: PASV/PORT modes for file transfers
+- **Extended Data Connections**: PORT/EPSV/EPRT modes for broader client support
 - **Advanced Protocol Features**: Resume support, binary/ASCII modes
-- **Wildcard Pattern Support**: Complex path matching via monk-api Filter system
-- **Performance Optimizations**: Caching, connection pooling
-- **Production Deployment**: Docker, systemd, monitoring
+- **Multi-Tenant Support**: servers.json integration for /tenant/* paths
+- **Performance Optimizations**: HTTP connection pooling, streaming transfers
+- **Production Deployment**: Docker, systemd, monitoring, structured logging
 
 ## Contributing Guidelines
 
@@ -482,10 +495,11 @@ npm run test
 npm run dev               # Start both servers with auto-reload and cleanup
 
 # Testing
-npm run spec              # Complete test suite (30+ tests)
+npm run spec              # Complete test suite (68+ tests)
 npm run spec:ts           # TypeScript tests only
-npm run spec:ts commands  # Command-specific tests
+npm run spec:ts commands  # Command-specific tests  
 npm run spec:ts unit      # Unit tests only
+npm run spec:ts rate-limiting  # Security tests (29 tests)
 
 # FTP Testing (WORKING)
 # netcat: Most reliable for protocol testing
@@ -504,6 +518,10 @@ curl -X POST http://localhost:9001/ftp/list \
 
 # Debug
 DEBUG=monk-ftp:* npm run start:dev
+
+# Security Testing
+echo -e "USER root\r\nPASS invalid\r\nPASS invalid\r\nPASS invalid\r\nPASS invalid\r\n" | nc localhost 2121  # Test auth rate limiting
+echo -e "LIST ../../../etc/passwd\r\nQUIT\r\n" | nc localhost 2121  # Test path validation
 ```
 
 ### **Key Configuration Files**
@@ -707,11 +725,13 @@ The monk-ftp server reached 1.0.0 milestone with complete FTP protocol complianc
 
 #### **Major Features Completed:**
 
-1. **CLNT Command**: Client identification support for ncftp and other FTP clients
-2. **APPE Command**: File append operations for database field updates  
-3. **FUSE Directory Detection**: Fixed filesystem showing directories as files
-4. **Simplified Command Registration**: String-based auto-discovery pattern
-5. **Complete Test Coverage**: 39+ unit tests with 1:1 command-to-test mapping
+1. **Complete FTP Protocol**: 16 commands with full RFC 959 compliance
+2. **Security Hardening**: Rate limiting and path validation protection
+3. **Client Compatibility**: CLNT command support for ncftp and other FTP clients
+4. **File Operations**: STOR/RETR/APPE/DELE with complete data connection support
+5. **FUSE Filesystem**: Directory detection and Unix tool compatibility
+6. **Comprehensive Testing**: 68+ unit tests including 29 security tests
+7. **Production Readiness**: Enhanced security for production deployment
 
 #### **FUSE Directory Detection Fix:**
 **Problem**: `ls -la fuse/` showed:
