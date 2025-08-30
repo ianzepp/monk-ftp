@@ -108,7 +108,7 @@ export class FilesystemFakeApi {
             
             this.sendJsonResponse(res, 200, {
                 success: true,
-                entries,
+                data: entries,
                 pattern_info: {
                     complexity: 'simple',
                     cache_hit: false,
