@@ -1,7 +1,7 @@
 /**
  * APPE command handler - Append to file
- * 
- * Appends data to an existing file via monk-api POST /ftp/append endpoint
+ *
+ * Appends data to an existing file via monk-api POST /api/file/store endpoint (with append_mode)
  */
 
 import { BaseFtpCommand } from '../lib/base-command.js';
@@ -41,13 +41,12 @@ export class AppeCommand extends BaseFtpCommand {
                     // Parse content based on file type
                     const content = await this.parseFileContent(filePath, fileContent);
                     
-                    // Append via monk-api
+                    // Append via monk-api (uses store with append_mode internally)
                     const response = await this.apiClient.append(
                         filePath,
                         content,
                         {
                             atomic: true,
-                            create_if_missing: false,
                             validate_schema: true
                         },
                         connection.jwtToken!

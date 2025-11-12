@@ -1,7 +1,7 @@
 /**
  * LIST command handler - Directory listing
- * 
- * Thin wrapper around monk-api POST /ftp/list endpoint
+ *
+ * Thin wrapper around monk-api POST /api/file/list endpoint
  */
 
 import { BaseFtpCommand } from '../lib/base-command.js';
@@ -16,8 +16,8 @@ export class ListCommand extends BaseFtpCommand {
         try {
             // Determine path to list
             const listPath = args ? this.resolvePath(connection.currentPath, args) : connection.currentPath;
-            
-            // Call monk-api /ftp/list endpoint
+
+            // Call monk-api /api/file/list endpoint
             const response = await this.apiClient.list(
                 listPath,
                 {
@@ -60,12 +60,12 @@ export class ListCommand extends BaseFtpCommand {
     private formatFtpListing(entries: any[]): string {
         return entries.map(entry => {
             // Convert to standard FTP listing format
-            const type = entry.ftp_type === 'd' ? 'd' : '-';
-            const permissions = entry.ftp_permissions || 'rwx';
-            const size = entry.ftp_size.toString().padStart(8);
-            const date = this.formatFtpDate(entry.ftp_modified);
+            const type = entry.file_type === 'd' ? 'd' : '-';
+            const permissions = entry.file_permissions || 'rwx';
+            const size = entry.file_size.toString().padStart(8);
+            const date = this.formatFtpDate(entry.file_modified);
             const name = entry.name;
-            
+
             return `${type}${permissions} 1 monk monk ${size} ${date} ${name}`;
         }).join('\r\n');
     }

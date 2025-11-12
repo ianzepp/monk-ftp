@@ -1,7 +1,7 @@
 /**
  * SIZE command handler - File size query
- * 
- * Uses dedicated /ftp/size endpoint for optimized file size queries
+ *
+ * Uses dedicated /api/file/size endpoint for optimized file size queries
  */
 
 import { BaseFtpCommand } from '../lib/base-command.js';
@@ -21,8 +21,8 @@ export class SizeCommand extends BaseFtpCommand {
         try {
             // Resolve file path
             const filePath = this.resolvePath(connection.currentPath, args);
-            
-            // Call monk-api /ftp/size endpoint (dedicated lightweight endpoint)
+
+            // Call monk-api /api/file/size endpoint (dedicated lightweight endpoint)
             const response = await this.apiClient.size(filePath, connection.jwtToken!);
 
             if (response.success) {
@@ -30,11 +30,11 @@ export class SizeCommand extends BaseFtpCommand {
                 this.sendResponse(connection, 213, response.size.toString());
             } else {
                 // Handle error responses based on error type
-                if (response.error === 'not_a_file') {
+                if (response.error === 'NOT_A_FILE' || response.error_code === 'NOT_A_FILE') {
                     this.sendResponse(connection, 550, 'Not a file');
-                } else if (response.error === 'file_not_found') {
+                } else if (response.error === 'RECORD_NOT_FOUND' || response.error_code === 'RECORD_NOT_FOUND') {
                     this.sendResponse(connection, 550, 'File not found');
-                } else if (response.error === 'permission_denied') {
+                } else if (response.error === 'PERMISSION_DENIED' || response.error_code === 'PERMISSION_DENIED') {
                     this.sendResponse(connection, 550, 'Permission denied');
                 } else {
                     this.sendResponse(connection, 550, 'File size not available');

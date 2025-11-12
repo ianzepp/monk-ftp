@@ -1,7 +1,7 @@
 /**
  * MDTM command handler - File modification time query
- * 
- * Uses dedicated /ftp/modify-time endpoint for optimized timestamp queries
+ *
+ * Uses dedicated /api/file/modify-time endpoint for optimized timestamp queries
  */
 
 import { BaseFtpCommand } from '../lib/base-command.js';
@@ -21,8 +21,8 @@ export class MdtmCommand extends BaseFtpCommand {
         try {
             // Resolve file path
             const filePath = this.resolvePath(connection.currentPath, args);
-            
-            // Call monk-api /ftp/modify-time endpoint (dedicated lightweight endpoint)
+
+            // Call monk-api /api/file/modify-time endpoint (dedicated lightweight endpoint)
             const response = await this.apiClient.modifyTime(filePath, connection.jwtToken!);
 
             if (response.success) {
@@ -30,9 +30,9 @@ export class MdtmCommand extends BaseFtpCommand {
                 this.sendResponse(connection, 213, response.modified_time);
             } else {
                 // Handle error responses based on error type
-                if (response.error === 'file_not_found') {
+                if (response.error === 'RECORD_NOT_FOUND' || response.error_code === 'RECORD_NOT_FOUND') {
                     this.sendResponse(connection, 550, 'File not found');
-                } else if (response.error === 'permission_denied') {
+                } else if (response.error === 'PERMISSION_DENIED' || response.error_code === 'PERMISSION_DENIED') {
                     this.sendResponse(connection, 550, 'Permission denied');
                 } else {
                     this.sendResponse(connection, 550, 'File modification time not available');

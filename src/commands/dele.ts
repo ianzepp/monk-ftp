@@ -1,7 +1,7 @@
 /**
  * DELE command handler - File deletion
- * 
- * Thin wrapper around monk-api POST /ftp/delete endpoint
+ *
+ * Thin wrapper around monk-api POST /api/file/delete endpoint
  */
 
 import { BaseFtpCommand } from '../lib/base-command.js';
@@ -21,8 +21,8 @@ export class DeleCommand extends BaseFtpCommand {
         try {
             // Resolve file path
             const filePath = this.resolvePath(connection.currentPath, args);
-            
-            // Call monk-api /ftp/delete endpoint
+
+            // Call monk-api /api/file/delete endpoint
             const response = await this.apiClient.delete(
                 filePath,
                 {

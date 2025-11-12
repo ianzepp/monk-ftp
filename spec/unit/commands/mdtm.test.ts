@@ -3,12 +3,11 @@ import { MdtmCommand } from '@src/commands/mdtm.js';
 import { createMockConnection, getLastResponse, createTestCommand } from '@spec/helpers/command-test-helper.js';
 
 describe('MDTM command', () => {
-    test('should return modification time from STAT response', async () => {
+    test('should return modification time from modify-time endpoint', async () => {
         const { command } = createTestCommand(MdtmCommand, {
-            stat: {
+            'modify-time': {
                 success: true,
-                modified_time: '20250825151723',
-                type: 'file'
+                modified_time: '20250825151723'
             }
         });
         
@@ -25,10 +24,9 @@ describe('MDTM command', () => {
 
     test('should handle field-level file timestamps', async () => {
         const { command, mockApi } = createTestCommand(MdtmCommand, {
-            stat: {
+            'modify-time': {
                 success: true,
-                modified_time: '20250825120000',
-                type: 'file'
+                modified_time: '20250825120000'
             }
         });
         
@@ -48,7 +46,7 @@ describe('MDTM command', () => {
 
     test('should handle absolute paths', async () => {
         const { command, mockApi } = createTestCommand(MdtmCommand, {
-            stat: {
+            'modify-time': {
                 success: true,
                 modified_time: '20250101000000'
             }
@@ -78,17 +76,17 @@ describe('MDTM command', () => {
 
     test('should handle file not found error', async () => {
         const { command } = createTestCommand(MdtmCommand);
-        
+
         // Mock API client to throw 404 error
         (command as any).apiClient = {
-            stat: async () => {
+            modifyTime: async () => {
                 throw new Error('404 File not found');
             }
         };
-        
+
         const connection = createMockConnection();
         await command.execute(connection, 'missing.json');
-        
+
         const response = getLastResponse(connection);
         expect(response.code).toBe(550);
         expect(response.message).toBe('File not found');
@@ -96,16 +94,16 @@ describe('MDTM command', () => {
 
     test('should handle permission denied error', async () => {
         const { command } = createTestCommand(MdtmCommand);
-        
+
         (command as any).apiClient = {
-            stat: async () => {
+            modifyTime: async () => {
                 throw new Error('403 Permission denied');
             }
         };
-        
+
         const connection = createMockConnection();
         await command.execute(connection, 'restricted.json');
-        
+
         const response = getLastResponse(connection);
         expect(response.code).toBe(550);
         expect(response.message).toBe('Permission denied');

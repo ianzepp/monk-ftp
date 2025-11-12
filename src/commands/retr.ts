@@ -1,7 +1,7 @@
 /**
  * RETR command handler - File download
- * 
- * Downloads files from monk-api POST /ftp/retrieve endpoint
+ *
+ * Downloads files from monk-api POST /api/file/retrieve endpoint
  * Note: Requires data connection implementation for full functionality
  */
 

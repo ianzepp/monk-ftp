@@ -1,7 +1,7 @@
 /**
  * Fake monk-api Server for Testing
- * 
- * Implements the /ftp/* endpoints from monk-api/docs/FTP.md
+ *
+ * Implements the /api/file/* endpoints from monk-api File API docs
  * for independent monk-ftp testing without requiring full monk-api setup.
  */
 
@@ -14,12 +14,12 @@ interface FakeApiConfig {
     debug: boolean;
 }
 
-interface FtpListEntry {
+interface FileListEntry {
     name: string;
-    ftp_type: 'd' | 'f' | 'l';
-    ftp_size: number;
-    ftp_permissions: string;
-    ftp_modified: string;
+    file_type: 'd' | 'f' | 'l';
+    file_size: number;
+    file_permissions: string;
+    file_modified: string;
     path: string;
     api_context: {
         schema?: string;
@@ -28,51 +28,60 @@ interface FtpListEntry {
     };
 }
 
-interface FtpListResponse {
+interface FileListResponse {
     success: boolean;
-    entries: FtpListEntry[];
-    pattern_info?: {
-        complexity: string;
-        cache_hit: boolean;
-        query_time_ms: number;
+    entries: FileListEntry[];
+    file_metadata?: {
+        path: string;
+        type: string;
+        permissions: string;
+        size: number;
+        modified_time: string;
     };
 }
 
-interface FtpStoreResponse {
+interface FileStoreResponse {
     success: boolean;
     operation: 'create' | 'update';
     result: {
         record_id: string;
-        size: number;
         created: boolean;
+        updated: boolean;
         validation_passed: boolean;
     };
-    ftp_metadata: {
-        modified_time: string;
+    file_metadata: {
+        path: string;
+        type: string;
         permissions: string;
-        etag: string;
+        size: number;
+        modified_time: string;
         content_type: string;
+        etag: string;
     };
 }
 
-interface FtpDeleteResponse {
+interface FileDeleteResponse {
     success: boolean;
-    operation: 'soft_delete' | 'hard_delete' | 'field_clear';
-    result: {
-        record_id?: string;
-        field?: string;
-        deleted: boolean;
+    operation: 'soft_delete' | 'permanent_delete' | 'field_delete';
+    results: {
+        deleted_count: number;
+        paths: string[];
+        records_affected: string[];
+    };
+    file_metadata?: {
+        can_restore: boolean;
+        restore_deadline?: string;
     };
 }
 
-interface FtpRetrieveResponse {
+interface FileRetrieveResponse {
     success: boolean;
     content: any;
-    content_type: string;
-    size: number;
-    ftp_metadata: {
+    file_metadata: {
+        size: number;
         modified_time: string;
-        permissions: string;
+        content_type: string;
+        can_resume: boolean;
         etag: string;
     };
 }
@@ -90,7 +99,7 @@ export class FakeMonkApi {
         return new Promise((resolve) => {
             this.server.listen(this.config.port, this.config.host, () => {
                 console.log(`🎭 Fake monk-api server running on ${this.config.host}:${this.config.port}`);
-                console.log(`   Available endpoints: /ftp/list, /ftp/store, /ftp/delete, /ftp/retrieve`);
+                console.log(`   Available endpoints: /api/file/list, /api/file/store, /api/file/delete, /api/file/retrieve`);
                 resolve();
             });
         });
@@ -124,14 +133,14 @@ export class FakeMonkApi {
             }
 
             // Route to appropriate handler
-            if (url.pathname === '/ftp/list' && method === 'POST') {
-                await this.handleFtpList(req, res, body);
-            } else if (url.pathname === '/ftp/store' && method === 'POST') {
-                await this.handleFtpStore(req, res, body);
-            } else if (url.pathname === '/ftp/delete' && method === 'POST') {
-                await this.handleFtpDelete(req, res, body);
-            } else if (url.pathname === '/ftp/retrieve' && method === 'POST') {
-                await this.handleFtpRetrieve(req, res, body);
+            if (url.pathname === '/api/file/list' && method === 'POST') {
+                await this.handleFileList(req, res, body);
+            } else if (url.pathname === '/api/file/store' && method === 'POST') {
+                await this.handleFileStore(req, res, body);
+            } else if (url.pathname === '/api/file/delete' && method === 'POST') {
+                await this.handleFileDelete(req, res, body);
+            } else if (url.pathname === '/api/file/retrieve' && method === 'POST') {
+                await this.handleFileRetrieve(req, res, body);
             } else if (url.pathname === '/health' && method === 'GET') {
                 this.sendJsonResponse(res, 200, { status: 'ok', server: 'fake-monk-api' });
             } else {
@@ -144,64 +153,71 @@ export class FakeMonkApi {
         }
     }
 
-    private async handleFtpList(req: http.IncomingMessage, res: http.ServerResponse, body: any): Promise<void> {
-        const { path, ftp_options = {} } = body;
-        
+    private async handleFileList(req: http.IncomingMessage, res: http.ServerResponse, body: any): Promise<void> {
+        const { path, file_options = {} } = body;
+
         if (!this.isAuthenticated(req)) {
             this.sendJsonResponse(res, 401, { error: 'Authentication required' });
             return;
         }
 
-        const entries = this.getFakeListEntries(path, ftp_options);
-        
-        const response: FtpListResponse = {
+        const entries = this.getFakeListEntries(path, file_options);
+
+        const response: FileListResponse = {
             success: true,
             entries,
-            pattern_info: {
-                complexity: 'simple',
-                cache_hit: false,
-                query_time_ms: Math.random() * 50
+            file_metadata: {
+                path: path,
+                type: 'directory',
+                permissions: 'r-x',
+                size: 0,
+                modified_time: this.getCurrentTimestamp()
             }
         };
 
         this.sendJsonResponse(res, 200, response);
     }
 
-    private async handleFtpStore(req: http.IncomingMessage, res: http.ServerResponse, body: any): Promise<void> {
-        const { path, content, ftp_options = {} } = body;
-        
+    private async handleFileStore(req: http.IncomingMessage, res: http.ServerResponse, body: any): Promise<void> {
+        const { path, content, file_options = {} } = body;
+
         if (!this.isAuthenticated(req)) {
             this.sendJsonResponse(res, 401, { error: 'Authentication required' });
             return;
         }
+
+        const existed = this.fakeDataStore.has(path);
 
         // Store content in fake data store
         this.fakeDataStore.set(path, content);
 
         const recordId = this.extractRecordIdFromPath(path);
-        const response: FtpStoreResponse = {
+        const response: FileStoreResponse = {
             success: true,
-            operation: this.fakeDataStore.has(path) ? 'update' : 'create',
+            operation: existed ? 'update' : 'create',
             result: {
                 record_id: recordId,
-                size: JSON.stringify(content).length,
-                created: !this.fakeDataStore.has(path),
+                created: !existed,
+                updated: existed,
                 validation_passed: true
             },
-            ftp_metadata: {
-                modified_time: this.getCurrentTimestamp(),
+            file_metadata: {
+                path: path,
+                type: 'file',
                 permissions: 'rwx',
-                etag: Math.random().toString(36).substr(2, 12),
-                content_type: 'application/json'
+                size: JSON.stringify(content).length,
+                modified_time: this.getCurrentTimestamp(),
+                content_type: 'application/json',
+                etag: Math.random().toString(36).substr(2, 12)
             }
         };
 
-        this.sendJsonResponse(res, 200, response);
+        this.sendJsonResponse(res, 201, response);
     }
 
-    private async handleFtpDelete(req: http.IncomingMessage, res: http.ServerResponse, body: any): Promise<void> {
-        const { path, ftp_options = {} } = body;
-        
+    private async handleFileDelete(req: http.IncomingMessage, res: http.ServerResponse, body: any): Promise<void> {
+        const { path, file_options = {} } = body;
+
         if (!this.isAuthenticated(req)) {
             this.sendJsonResponse(res, 401, { error: 'Authentication required' });
             return;
@@ -209,26 +225,30 @@ export class FakeMonkApi {
 
         const recordId = this.extractRecordIdFromPath(path);
         const isField = path.includes('/') && !path.endsWith('.json');
-        
+
         // Remove from fake data store
         this.fakeDataStore.delete(path);
 
-        const response: FtpDeleteResponse = {
+        const response: FileDeleteResponse = {
             success: true,
-            operation: ftp_options.permanent ? 'hard_delete' : 'soft_delete',
-            result: {
-                record_id: recordId,
-                field: isField ? path.split('/').pop() : undefined,
-                deleted: true
+            operation: file_options.permanent ? 'permanent_delete' : 'soft_delete',
+            results: {
+                deleted_count: 1,
+                paths: [path],
+                records_affected: [recordId]
+            },
+            file_metadata: {
+                can_restore: !file_options.permanent,
+                restore_deadline: file_options.permanent ? undefined : '2025-01-01T12:00:00Z'
             }
         };
 
         this.sendJsonResponse(res, 200, response);
     }
 
-    private async handleFtpRetrieve(req: http.IncomingMessage, res: http.ServerResponse, body: any): Promise<void> {
-        const { path, ftp_options = {} } = body;
-        
+    private async handleFileRetrieve(req: http.IncomingMessage, res: http.ServerResponse, body: any): Promise<void> {
+        const { path, file_options = {} } = body;
+
         if (!this.isAuthenticated(req)) {
             this.sendJsonResponse(res, 401, { error: 'Authentication required' });
             return;
@@ -236,14 +256,14 @@ export class FakeMonkApi {
 
         const content = this.fakeDataStore.get(path) || this.generateFakeContent(path);
 
-        const response: FtpRetrieveResponse = {
+        const response: FileRetrieveResponse = {
             success: true,
             content,
-            content_type: 'application/json',
-            size: JSON.stringify(content).length,
-            ftp_metadata: {
+            file_metadata: {
+                size: JSON.stringify(content).length,
                 modified_time: this.getCurrentTimestamp(),
-                permissions: 'rwx',
+                content_type: 'application/json',
+                can_resume: false,
                 etag: Math.random().toString(36).substr(2, 12)
             }
         };
@@ -280,28 +300,28 @@ export class FakeMonkApi {
         return data;
     }
 
-    private getFakeListEntries(path: string, options: any): FtpListEntry[] {
+    private getFakeListEntries(path: string, options: any): FileListEntry[] {
         const now = this.getCurrentTimestamp();
-        
+
         switch (path) {
             case '/':
             case '/data/':
                 return [
                     {
                         name: 'users',
-                        ftp_type: 'd',
-                        ftp_size: 0,
-                        ftp_permissions: 'rwx',
-                        ftp_modified: now,
+                        file_type: 'd',
+                        file_size: 0,
+                        file_permissions: 'rwx',
+                        file_modified: now,
                         path: '/data/users/',
                         api_context: { access_level: 'full' }
                     },
                     {
-                        name: 'accounts', 
-                        ftp_type: 'd',
-                        ftp_size: 0,
-                        ftp_permissions: 'rwx',
-                        ftp_modified: now,
+                        name: 'accounts',
+                        file_type: 'd',
+                        file_size: 0,
+                        file_permissions: 'rwx',
+                        file_modified: now,
                         path: '/data/accounts/',
                         api_context: { access_level: 'full' }
                     }
@@ -311,19 +331,19 @@ export class FakeMonkApi {
                 return [
                     {
                         name: 'user-123',
-                        ftp_type: 'd',
-                        ftp_size: 0,
-                        ftp_permissions: 'rwx',
-                        ftp_modified: now,
+                        file_type: 'd',
+                        file_size: 0,
+                        file_permissions: 'rwx',
+                        file_modified: now,
                         path: '/data/users/user-123/',
                         api_context: { schema: 'users', record_id: 'user-123', access_level: 'full' }
                     },
                     {
                         name: 'user-456',
-                        ftp_type: 'd',
-                        ftp_size: 0,
-                        ftp_permissions: 'rwx', 
-                        ftp_modified: now,
+                        file_type: 'd',
+                        file_size: 0,
+                        file_permissions: 'rwx',
+                        file_modified: now,
                         path: '/data/users/user-456/',
                         api_context: { schema: 'users', record_id: 'user-456', access_level: 'full' }
                     }
@@ -333,28 +353,28 @@ export class FakeMonkApi {
                 return [
                     {
                         name: 'id',
-                        ftp_type: 'f',
-                        ftp_size: 36,
-                        ftp_permissions: 'rw-',
-                        ftp_modified: now,
+                        file_type: 'f',
+                        file_size: 36,
+                        file_permissions: 'rw-',
+                        file_modified: now,
                         path: '/data/users/user-123/id',
                         api_context: { schema: 'users', record_id: 'user-123', access_level: 'read' }
                     },
                     {
                         name: 'name',
-                        ftp_type: 'f',
-                        ftp_size: 8,
-                        ftp_permissions: 'rw-',
-                        ftp_modified: now,
+                        file_type: 'f',
+                        file_size: 8,
+                        file_permissions: 'rw-',
+                        file_modified: now,
                         path: '/data/users/user-123/name',
                         api_context: { schema: 'users', record_id: 'user-123', access_level: 'edit' }
                     },
                     {
                         name: 'user-123.json',
-                        ftp_type: 'f',
-                        ftp_size: 256,
-                        ftp_permissions: 'rw-',
-                        ftp_modified: now,
+                        file_type: 'f',
+                        file_size: 256,
+                        file_permissions: 'rw-',
+                        file_modified: now,
                         path: '/data/users/user-123.json',
                         api_context: { schema: 'users', record_id: 'user-123', access_level: 'full' }
                     }

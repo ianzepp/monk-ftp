@@ -29,8 +29,8 @@ describe('Fake monk-api server', () => {
         expect(data.server).toBe('fake-monk-api');
     });
 
-    test('should handle /ftp/list endpoint', async () => {
-        const response = await fetch(`http://localhost:${apiPort}/ftp/list`, {
+    test('should handle /api/file/list endpoint', async () => {
+        const response = await fetch(`http://localhost:${apiPort}/api/file/list`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -38,7 +38,7 @@ describe('Fake monk-api server', () => {
             },
             body: JSON.stringify({
                 path: '/data/users/',
-                ftp_options: {
+                file_options: {
                     show_hidden: false,
                     long_format: true
                 }
@@ -46,25 +46,25 @@ describe('Fake monk-api server', () => {
         });
 
         const data = await response.json();
-        
+
         expect(response.status).toBe(200);
         expect(data.success).toBe(true);
         expect(data.entries).toBeDefined();
         expect(Array.isArray(data.entries)).toBe(true);
         expect(data.entries.length).toBeGreaterThan(0);
-        
-        // Check entry structure matches FTP.md spec
+
+        // Check entry structure matches File API spec
         const entry = data.entries[0];
         expect(entry).toHaveProperty('name');
-        expect(entry).toHaveProperty('ftp_type');
-        expect(entry).toHaveProperty('ftp_size');
-        expect(entry).toHaveProperty('ftp_permissions');
-        expect(entry).toHaveProperty('ftp_modified');
+        expect(entry).toHaveProperty('file_type');
+        expect(entry).toHaveProperty('file_size');
+        expect(entry).toHaveProperty('file_permissions');
+        expect(entry).toHaveProperty('file_modified');
         expect(entry).toHaveProperty('api_context');
     });
 
-    test('should handle /ftp/store endpoint', async () => {
-        const response = await fetch(`http://localhost:${apiPort}/ftp/store`, {
+    test('should handle /api/file/store endpoint', async () => {
+        const response = await fetch(`http://localhost:${apiPort}/api/file/store`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -77,7 +77,7 @@ describe('Fake monk-api server', () => {
                     name: 'Test User',
                     email: 'test@example.com'
                 },
-                ftp_options: {
+                file_options: {
                     atomic: true,
                     overwrite: true
                 }
@@ -85,16 +85,16 @@ describe('Fake monk-api server', () => {
         });
 
         const data = await response.json();
-        
-        expect(response.status).toBe(200);
+
+        expect(response.status).toBe(201);
         expect(data.success).toBe(true);
         expect(data.operation).toMatch(/create|update/);
         expect(data.result).toHaveProperty('record_id');
-        expect(data.ftp_metadata).toHaveProperty('modified_time');
+        expect(data.file_metadata).toHaveProperty('modified_time');
     });
 
     test('should require authentication', async () => {
-        const response = await fetch(`http://localhost:${apiPort}/ftp/list`, {
+        const response = await fetch(`http://localhost:${apiPort}/api/file/list`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'

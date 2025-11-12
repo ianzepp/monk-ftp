@@ -1,7 +1,7 @@
 /**
  * STAT command handler - File/directory status information
- * 
- * Provides detailed metadata via monk-api POST /ftp/stat endpoint
+ *
+ * Provides detailed metadata via monk-api POST /api/file/stat endpoint
  * Uses FTP multi-line response format (213-xxx ... 213 End)
  */
 
@@ -17,8 +17,8 @@ export class StatCommand extends BaseFtpCommand {
         try {
             // Use current path if no args provided
             const statPath = args ? this.resolvePath(connection.currentPath, args) : connection.currentPath;
-            
-            // Call monk-api /ftp/stat endpoint
+
+            // Call monk-api /api/file/stat endpoint
             const response = await this.apiClient.stat(statPath, connection.jwtToken!);
 
             if (response.success) {

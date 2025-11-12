@@ -79,24 +79,49 @@ export class MockApiClient {
         this.mockResponses.set(endpoint, response);
     }
 
-    async callFtpEndpoint(endpoint: string, payload: any, jwtToken: string): Promise<any> {
+    async callFileEndpoint(endpoint: string, payload: any, jwtToken: string): Promise<any> {
         this.callLog.push({ endpoint, payload });
-        
+
         const mockResponse = this.mockResponses.get(endpoint);
         if (mockResponse) {
             return mockResponse;
         }
-        
+
         // Default successful response
         return { success: true };
     }
 
     async stat(path: string, jwtToken: string): Promise<any> {
-        return this.callFtpEndpoint('stat', { path }, jwtToken);
+        return this.callFileEndpoint('stat', { path }, jwtToken);
     }
 
     async list(path: string, options: any, jwtToken: string): Promise<any> {
-        return this.callFtpEndpoint('list', { path, ftp_options: options }, jwtToken);
+        return this.callFileEndpoint('list', { path, file_options: options }, jwtToken);
+    }
+
+    async size(path: string, jwtToken: string): Promise<any> {
+        return this.callFileEndpoint('size', { path }, jwtToken);
+    }
+
+    async modifyTime(path: string, jwtToken: string): Promise<any> {
+        return this.callFileEndpoint('modify-time', { path }, jwtToken);
+    }
+
+    async retrieve(path: string, options: any, jwtToken: string): Promise<any> {
+        return this.callFileEndpoint('retrieve', { path, file_options: options }, jwtToken);
+    }
+
+    async store(path: string, content: any, options: any, jwtToken: string): Promise<any> {
+        return this.callFileEndpoint('store', { path, content, file_options: options }, jwtToken);
+    }
+
+    async delete(path: string, options: any, jwtToken: string): Promise<any> {
+        return this.callFileEndpoint('delete', { path, file_options: options }, jwtToken);
+    }
+
+    async append(path: string, content: any, options: any, jwtToken: string): Promise<any> {
+        // APPEND is now handled via STORE with append_mode option
+        return this.callFileEndpoint('store', { path, content, file_options: { ...options, append_mode: true } }, jwtToken);
     }
 }
 

@@ -1,7 +1,7 @@
 /**
  * STOR command handler - File upload
- * 
- * Handles file uploads to monk-api POST /ftp/store endpoint
+ *
+ * Handles file uploads to monk-api POST /api/file/store endpoint
  * Note: Requires data connection implementation for full functionality
  */
 

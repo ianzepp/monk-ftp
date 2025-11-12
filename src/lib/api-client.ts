@@ -1,12 +1,12 @@
 /**
- * HTTP client for monk-api /ftp/* endpoints
+ * HTTP client for monk-api /api/file/* endpoints
  */
 
 export class MonkApiClient {
     constructor(private baseUrl: string, private debug: boolean = false) {}
 
-    async callFtpEndpoint(endpoint: string, payload: any, jwtToken: string): Promise<any> {
-        const url = `${this.baseUrl}/ftp/${endpoint}`;
+    async callFileEndpoint(endpoint: string, payload: any, jwtToken: string): Promise<any> {
+        const url = `${this.baseUrl}/api/file/${endpoint}`;
         
         if (this.debug) {
             console.log(`🌐 API Call: POST ${url}`);
@@ -36,34 +36,35 @@ export class MonkApiClient {
     }
 
     async list(path: string, options: any, jwtToken: string): Promise<any> {
-        return this.callFtpEndpoint('list', { path, ftp_options: options }, jwtToken);
+        return this.callFileEndpoint('list', { path, file_options: options }, jwtToken);
     }
 
     async store(path: string, content: any, options: any, jwtToken: string): Promise<any> {
-        return this.callFtpEndpoint('store', { path, content, ftp_options: options }, jwtToken);
+        return this.callFileEndpoint('store', { path, content, file_options: options }, jwtToken);
     }
 
     async retrieve(path: string, options: any, jwtToken: string): Promise<any> {
-        return this.callFtpEndpoint('retrieve', { path, ftp_options: options }, jwtToken);
+        return this.callFileEndpoint('retrieve', { path, file_options: options }, jwtToken);
     }
 
     async delete(path: string, options: any, jwtToken: string): Promise<any> {
-        return this.callFtpEndpoint('delete', { path, ftp_options: options }, jwtToken);
+        return this.callFileEndpoint('delete', { path, file_options: options }, jwtToken);
     }
 
     async stat(path: string, jwtToken: string): Promise<any> {
-        return this.callFtpEndpoint('stat', { path }, jwtToken);
+        return this.callFileEndpoint('stat', { path }, jwtToken);
     }
 
     async append(path: string, content: any, options: any, jwtToken: string): Promise<any> {
-        return this.callFtpEndpoint('append', { path, content, ftp_options: options }, jwtToken);
+        // APPEND is now handled via STORE with append_mode option
+        return this.callFileEndpoint('store', { path, content, file_options: { ...options, append_mode: true } }, jwtToken);
     }
 
     async size(path: string, jwtToken: string): Promise<any> {
-        return this.callFtpEndpoint('size', { path }, jwtToken);
+        return this.callFileEndpoint('size', { path }, jwtToken);
     }
 
     async modifyTime(path: string, jwtToken: string): Promise<any> {
-        return this.callFtpEndpoint('modify-time', { path }, jwtToken);
+        return this.callFileEndpoint('modify-time', { path }, jwtToken);
     }
 }
